@@ -11,3 +11,10 @@ pydantic-settings
 email-validator
 psycopg2-binary
 zero-python-sdk
+
+# Testing dependencies
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+faker

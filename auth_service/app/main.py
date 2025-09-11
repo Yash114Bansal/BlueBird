@@ -228,7 +228,7 @@ async def service_info():
     }
 
 # Include API routers
-app.include_router(v1_router)
+app.include_router(v1_router, prefix="/api")
 
 
 if __name__ == "__main__":
