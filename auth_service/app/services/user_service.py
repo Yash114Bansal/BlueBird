@@ -145,7 +145,8 @@ class UserService:
         self, 
         user_id: int, 
         update_data: dict, 
-        user_repo: UserRepository
+        user_repo: UserRepository,
+        is_admin: bool = False
     ) -> Optional[User]:
         """
         Update user profile information.
@@ -154,15 +155,25 @@ class UserService:
             user_id: User ID
             update_data: Update data dictionary
             user_repo: User repository instance
+            is_admin: Whether the requesting user is an admin
             
         Returns:
             Updated user or None if update failed
         """
         try:
+            # Filter out sensitive fields for regular users
+            if not is_admin:
+                sensitive_fields = ['is_active', 'is_verified', 'role']
+                filtered_data = {k: v for k, v in update_data.items() if k not in sensitive_fields}
+                if filtered_data != update_data:
+                    logger.warning(f"User {user_id} attempted to update sensitive fields, filtering them out")
+                update_data = filtered_data
+            
             # Check if email is being changed and if it's already taken
             if "email" in update_data:
                 existing_user = user_repo.get_by_email(update_data["email"])
                 if existing_user and existing_user.id != user_id:
+                    # TODO: Make Email Unverified
                     logger.warning(f"Profile update failed: email {update_data['email']} already exists")
                     return None
             

@@ -134,7 +134,8 @@ class AuthenticationService:
         self, 
         user_id: int, 
         update_data: dict, 
-        user_repo: UserRepository
+        user_repo: UserRepository,
+        is_admin: bool = False
     ) -> Optional[User]:
         """
         Update user profile information.
@@ -143,11 +144,12 @@ class AuthenticationService:
             user_id: User ID
             update_data: Update data dictionary
             user_repo: User repository instance
+            is_admin: Whether the requesting user is an admin
             
         Returns:
             Updated user or None if update failed
         """
-        return await self.user_service.update_user_profile(user_id, update_data, user_repo)
+        return await self.user_service.update_user_profile(user_id, update_data, user_repo, is_admin)
     
     async def verify_token(self, token: str) -> Optional[TokenData]:
         """Verify access token and return token data."""

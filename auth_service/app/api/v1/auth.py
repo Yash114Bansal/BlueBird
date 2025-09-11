@@ -283,7 +283,7 @@ async def update_current_user(
     try:
         update_data = user_update.dict(exclude_unset=True)
         updated_user = await auth_service.update_user_profile(
-            current_user.id, update_data, user_repo
+            current_user.id, update_data, user_repo, is_admin=False
         )
         
         if not updated_user:

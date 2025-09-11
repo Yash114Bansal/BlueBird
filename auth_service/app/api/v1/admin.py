@@ -9,7 +9,8 @@ from typing import List
 from ..dependencies import (
     get_user_repository,
     get_session_repository,
-    get_current_admin_user
+    get_current_admin_user,
+    get_auth_service
 )
 from ...schemas.auth import (
     UserResponse,
@@ -79,7 +80,8 @@ async def update_user(
     user_id: int,
     user_update: UserUpdate,
     current_user: User = Depends(get_current_admin_user),
-    user_repo = Depends(get_user_repository)
+    user_repo = Depends(get_user_repository),
+    auth_service = Depends(get_auth_service)
 ):
     """
     Update any user (admin only).
@@ -89,6 +91,7 @@ async def update_user(
         user_update: User update data
         current_user: Current admin user
         user_repo: User repository
+        auth_service: Authentication service
         
     Returns:
         Updated user data
@@ -98,7 +101,9 @@ async def update_user(
     """
     try:
         update_data = user_update.dict(exclude_unset=True)
-        updated_user = user_repo.update(user_id, **update_data)
+        updated_user = await auth_service.update_user_profile(
+            user_id, update_data, user_repo, is_admin=True
+        )
         
         if not updated_user:
             raise HTTPException(
