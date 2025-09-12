@@ -3,7 +3,7 @@ Pydantic schemas for Bookings Service.
 Handles request/response validation and serialization.
 """
 
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
@@ -52,21 +52,20 @@ class BookingItemCreate(BaseModel):
     price_per_item: Decimal = Field(..., gt=0, description="Price per individual ticket")
     quantity: int = Field(..., gt=0, le=10, description="Number of tickets (max 10)")
     
-    @validator('price_per_item')
+    @field_validator('price_per_item')
+    @classmethod
     def validate_price(cls, v):
         """Validate price has at most 2 decimal places."""
         if v.as_tuple().exponent < -2:
             raise ValueError('Price cannot have more than 2 decimal places')
         return v
     
-    @root_validator
-    def validate_total_price(cls, values):
+    @model_validator(mode='after')
+    def validate_total_price(self):
         """Calculate and validate total price."""
-        price = values.get('price_per_item')
-        quantity = values.get('quantity')
-        if price and quantity:
-            values['total_price'] = price * quantity
-        return values
+        if hasattr(self, 'price_per_item') and hasattr(self, 'quantity'):
+            self.total_price = self.price_per_item * self.quantity
+        return self
 
 
 class BookingCreate(BaseModel):
@@ -77,7 +76,8 @@ class BookingCreate(BaseModel):
     ticket_type: Optional[str] = Field(None, max_length=100, description="Type of tickets")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes for the booking")
     
-    @validator('quantity')
+    @field_validator('quantity')
+    @classmethod
     def validate_quantity(cls, v):
         """Validate booking quantity."""
         if v <= 0:
@@ -100,12 +100,6 @@ class BookingCancel(BaseModel):
     reason: Optional[str] = Field(None, max_length=500, description="Reason for cancellation")
 
 
-class PaymentUpdate(BaseModel):
-    """Schema for updating payment information."""
-    
-    payment_status: PaymentStatusEnum = Field(..., description="New payment status")
-    payment_method: Optional[str] = Field(None, max_length=50, description="Payment method used")
-    payment_reference: Optional[str] = Field(None, max_length=100, description="Payment reference/transaction ID")
 
 
 # Response schemas
@@ -211,7 +205,7 @@ class BookingQueryParams(BaseModel):
     page: int = Field(1, ge=1, description="Page number")
     page_size: int = Field(20, ge=1, le=100, description="Number of items per page")
     sort_by: str = Field("booking_date", description="Sort field")
-    sort_order: str = Field("desc", regex="^(asc|desc)$", description="Sort order")
+    sort_order: str = Field("desc", pattern="^(asc|desc)$", description="Sort order")
 
 
 class AvailabilityQueryParams(BaseModel):
@@ -257,7 +251,6 @@ class BookingCreateResponse(BaseModel):
     message: str = Field("Booking created successfully", description="Success message")
     booking: BookingResponse = Field(..., description="Created booking details")
     expires_at: datetime = Field(..., description="Booking expiry time")
-    payment_required: bool = Field(True, description="Whether payment is required")
 
 
 class BookingCancelResponse(BaseModel):
@@ -266,7 +259,6 @@ class BookingCancelResponse(BaseModel):
     success: bool = Field(True, description="Cancellation success")
     message: str = Field("Booking cancelled successfully", description="Success message")
     booking: BookingResponse = Field(..., description="Cancelled booking details")
-    refund_amount: Optional[float] = Field(None, description="Refund amount if applicable")
 
 
 # Pagination schemas

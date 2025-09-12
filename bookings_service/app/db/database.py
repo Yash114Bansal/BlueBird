@@ -62,7 +62,11 @@ class DatabaseManager:
                 pool_timeout=db_config["pool_timeout"],
                 pool_recycle=db_config["pool_recycle"],
                 echo=False,
-                future=True
+                future=True,
+                connect_args={
+                    "statement_cache_size": 0, 
+                    "prepared_statement_cache_size": 0  
+                }
             )
             
             # Create session factories

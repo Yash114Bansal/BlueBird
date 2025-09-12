@@ -135,7 +135,9 @@ class Booking(Base):
         """Check if booking has expired."""
         if not self.expires_at:
             return False
-        return datetime.now() > self.expires_at and self.status == BookingStatus.PENDING
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        return now > self.expires_at and self.status == BookingStatus.PENDING
 
 
 class BookingItem(Base):

@@ -16,6 +16,7 @@ from app.core.config import config
 from app.db.database import get_db, get_async_db
 from app.db.redis_client import redis_manager
 from app.schemas.booking import BookingErrorResponse
+from app.models.booking import Booking
 
 logger = logging.getLogger(__name__)
 
