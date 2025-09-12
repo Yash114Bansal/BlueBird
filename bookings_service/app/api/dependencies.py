@@ -323,7 +323,8 @@ async def check_service_health() -> Dict[str, Any]:
     try:
         # Check database connection
         db = next(get_db())
-        db.execute("SELECT 1")
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
         health_status["database"] = "healthy"
         db.close()
     except Exception as e:

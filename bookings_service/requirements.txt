@@ -33,6 +33,7 @@ pytest-asyncio
 pytest-cov
 httpx
 pyjwt
+psycopg2-binary
 
 # Development
 black
