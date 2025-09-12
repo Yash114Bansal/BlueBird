@@ -1,0 +1,3 @@
+"""
+Events Service Application Package.
+"""
