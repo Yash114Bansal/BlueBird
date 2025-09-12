@@ -330,6 +330,6 @@ class DistributedLock:
 
 
 # Utility functions
-async def get_distributed_lock(lock_key: str, timeout: int = 30, blocking_timeout: int = 10) -> DistributedLock:
+def get_distributed_lock(lock_key: str, timeout: int = 30, blocking_timeout: int = 10) -> DistributedLock:
     """Get a distributed lock context manager."""
     return DistributedLock(redis_manager, lock_key, timeout, blocking_timeout)
