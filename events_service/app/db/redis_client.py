@@ -10,6 +10,9 @@ from redis.asyncio import Redis
 
 from ..core.config import config
 
+logger = logging.getLogger(__name__)
+
+
 class RedisConnection:
     """
     Redis connection manager for Events Service.
