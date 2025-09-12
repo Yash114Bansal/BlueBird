@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ...db.database import EventRepository
 from ...db.redis_client import CacheManager
 from ...schemas.event import EventCreate, EventUpdate, EventResponse, MessageResponse
+from ...services.event_publisher import EventPublisher
 from ..dependencies import (
     get_event_repository, get_cache_manager, get_current_admin_user
 )
@@ -47,6 +48,10 @@ async def create_event(
         
         # Invalidate events list cache
         await cache_manager.delete_pattern("events:list:*")
+        
+        # Publish event created notification
+        event_publisher = EventPublisher(cache_manager)
+        await event_publisher.publish_event_created(event)
         
         return event
         
@@ -103,6 +108,10 @@ async def update_event(
         # Invalidate caches
         await cache_manager.invalidate_event_cache(event_id)
         
+        # Publish event updated notification
+        event_publisher = EventPublisher(cache_manager)
+        await event_publisher.publish_event_updated(updated_event)
+        
         return updated_event
         
     except HTTPException:
@@ -155,6 +164,10 @@ async def delete_event(
         
         # Invalidate caches
         await cache_manager.invalidate_event_cache(event_id)
+        
+        # Publish event deleted notification
+        event_publisher = EventPublisher(cache_manager)
+        await event_publisher.publish_event_deleted(event_id)
         
         return MessageResponse(message="Event deleted successfully")
         

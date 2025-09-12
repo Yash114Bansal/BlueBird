@@ -1,0 +1,43 @@
+# FastAPI and web framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Database
+sqlalchemy
+asyncpg
+alembic
+
+# Redis
+redis[hiredis]
+
+# Authentication and security
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt==4.0.1
+python-multipart
+
+# Configuration management
+zero-python-sdk
+
+# Data validation and serialization
+pydantic
+pydantic-settings
+
+# HTTP client
+httpx
+
+# Testing
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+
+# Development
+black
+isort
+flake8
+greenlet
+
+# Monitoring and logging
+structlog
