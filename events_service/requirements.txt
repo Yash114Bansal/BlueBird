@@ -1,0 +1,20 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+redis
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart==0.0.6
+pydantic
+pydantic-settings
+email-validator
+psycopg2-binary
+zero-python-sdk
+
+# Testing dependencies
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+faker
