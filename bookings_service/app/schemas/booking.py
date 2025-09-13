@@ -162,10 +162,10 @@ class BookingSummaryResponse(BaseModel):
 class EventAvailabilityResponse(BaseModel):
     """Schema for event availability response."""
     
-    event_id: int
-    total_capacity: int
-    available_capacity: int
-    utilization_percentage: float
+    event_id: int = Field(gt=0, description="Event ID must be positive")
+    total_capacity: int = Field(ge=0, description="Total capacity must be non-negative")
+    available_capacity: int = Field(ge=0, description="Available capacity must be non-negative")
+    utilization_percentage: float = Field(ge=0.0, le=100.0, description="Utilization percentage must be between 0 and 100")
     last_updated: datetime
     
     class Config:
