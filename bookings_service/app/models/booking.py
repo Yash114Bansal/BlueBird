@@ -190,6 +190,9 @@ class EventAvailability(Base):
     reserved_capacity = Column(Integer, default=0, nullable=False)  # Pending bookings
     confirmed_capacity = Column(Integer, default=0, nullable=False)  # Confirmed bookings
     
+    # Event pricing
+    price = Column(Numeric(10, 2), nullable=False, default=0.00)  # Event price per ticket
+    
     # Locking mechanism
     version = Column(Integer, default=1, nullable=False)  # For optimistic locking
     last_updated = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -217,6 +220,7 @@ class EventAvailability(Base):
             "available_capacity": self.available_capacity,
             "reserved_capacity": self.reserved_capacity,
             "confirmed_capacity": self.confirmed_capacity,
+            "price": float(self.price),
             "version": self.version,
             "last_updated": self.last_updated.isoformat() if self.last_updated else None
         }
@@ -275,6 +279,158 @@ class BookingAuditLog(Base):
         return {
             "id": self.id,
             "booking_id": self.booking_id,
+            "action": self.action,
+            "field_name": self.field_name,
+            "old_value": self.old_value,
+            "new_value": self.new_value,
+            "changed_by": self.changed_by,
+            "changed_at": self.changed_at.isoformat() if self.changed_at else None,
+            "ip_address": self.ip_address,
+            "user_agent": self.user_agent,
+            "reason": self.reason
+        }
+
+
+class WaitlistStatus(PyEnum):
+    """Waitlist status enumeration."""
+    PENDING = "pending"           # User joined waitlist, waiting for availability
+    NOTIFIED = "notified"         # User notified of availability
+    BOOKED = "booked"             # User successfully booked from waitlist
+    EXPIRED = "expired"           # Waitlist entry expired
+    CANCELLED = "cancelled"       # User cancelled waitlist entry
+
+
+class WaitlistEntry(Base):
+    """
+    Waitlist model for managing event waitlist entries with high consistency.
+    Tracks users waiting for event availability with priority ordering.
+    """
+    
+    __tablename__ = "waitlist_entries"
+    
+    # Primary key
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Foreign keys
+    user_id = Column(Integer, nullable=False, index=True)  # References auth service
+    event_id = Column(Integer, nullable=False, index=True)  # References events service
+    
+    # Waitlist details
+    quantity = Column(Integer, nullable=False)
+    priority = Column(Integer, nullable=False, index=True)  # Lower number = higher priority
+    status = Column(Enum(WaitlistStatus), default=WaitlistStatus.PENDING, nullable=False, index=True)
+    
+    # Timing
+    joined_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    notified_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # For notification expiry
+    booked_at = Column(DateTime(timezone=True), nullable=True)
+    cancelled_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Metadata
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    version = Column(Integer, default=1, nullable=False)  # For optimistic locking
+    
+    # Additional fields
+    notes = Column(Text, nullable=True)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    
+    # Relationships
+    waitlist_audit_logs = relationship("WaitlistAuditLog", back_populates="waitlist_entry", cascade="all, delete-orphan")
+    
+    # Constraints
+    __table_args__ = (
+        CheckConstraint('quantity > 0', name='check_waitlist_quantity_positive'),
+        CheckConstraint('priority > 0', name='check_waitlist_priority_positive'),
+        CheckConstraint('version > 0', name='check_waitlist_version_positive'),
+        UniqueConstraint('user_id', 'event_id', name='unique_user_event_waitlist'),
+        Index('idx_waitlist_user_event', 'user_id', 'event_id'),
+        Index('idx_waitlist_status_priority', 'status', 'priority'),
+        Index('idx_waitlist_event_priority', 'event_id', 'priority'),
+        Index('idx_waitlist_expires', 'expires_at'),
+    )
+    
+    def __repr__(self):
+        return f"<WaitlistEntry(id={self.id}, user_id={self.user_id}, event_id={self.event_id}, priority={self.priority})>"
+    
+    def to_dict(self) -> dict:
+        """Convert waitlist entry to dictionary representation."""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "event_id": self.event_id,
+            "quantity": self.quantity,
+            "priority": self.priority,
+            "status": self.status.value,
+            "joined_at": self.joined_at.isoformat() if self.joined_at else None,
+            "notified_at": self.notified_at.isoformat() if self.notified_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "booked_at": self.booked_at.isoformat() if self.booked_at else None,
+            "cancelled_at": self.cancelled_at.isoformat() if self.cancelled_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "version": self.version,
+            "notes": self.notes
+        }
+    
+    @property
+    def is_active(self) -> bool:
+        """Check if waitlist entry is active (pending or notified)."""
+        return self.status in [WaitlistStatus.PENDING, WaitlistStatus.NOTIFIED]
+    
+    @property
+    def is_notification_expired(self) -> bool:
+        """Check if notification has expired."""
+        if not self.expires_at or self.status != WaitlistStatus.NOTIFIED:
+            return False
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        return now > self.expires_at
+
+
+class WaitlistAuditLog(Base):
+    """
+    Audit trail for waitlist changes to maintain data integrity.
+    Tracks all modifications to waitlist entries for compliance and debugging.
+    """
+    
+    __tablename__ = "waitlist_audit_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    waitlist_entry_id = Column(Integer, ForeignKey("waitlist_entries.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Change details
+    action = Column(String(50), nullable=False)  # JOIN, NOTIFY, BOOK, CANCEL, EXPIRE, etc.
+    field_name = Column(String(100), nullable=True)  # Which field was changed
+    old_value = Column(Text, nullable=True)  # Previous value
+    new_value = Column(Text, nullable=True)  # New value
+    
+    # Metadata
+    changed_by = Column(Integer, nullable=True)  # User ID who made the change
+    changed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ip_address = Column(String(45), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    reason = Column(Text, nullable=True)  # Reason for the change
+    
+    # Relationships
+    waitlist_entry = relationship("WaitlistEntry", back_populates="waitlist_audit_logs")
+    
+    # Constraints
+    __table_args__ = (
+        Index('idx_waitlist_audit_entry', 'waitlist_entry_id'),
+        Index('idx_waitlist_audit_action_date', 'action', 'changed_at'),
+    )
+    
+    def __repr__(self):
+        return f"<WaitlistAuditLog(id={self.id}, waitlist_entry_id={self.waitlist_entry_id}, action='{self.action}')>"
+    
+    def to_dict(self) -> dict:
+        """Convert waitlist audit log to dictionary representation."""
+        return {
+            "id": self.id,
+            "waitlist_entry_id": self.waitlist_entry_id,
             "action": self.action,
             "field_name": self.field_name,
             "old_value": self.old_value,

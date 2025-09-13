@@ -9,7 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
-from app.models.booking import BookingStatus, PaymentStatus
+from app.models.booking import BookingStatus, PaymentStatus, WaitlistStatus
 
 
 # Enums for API
@@ -30,6 +30,15 @@ class PaymentStatusEnum(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     REFUNDED = "refunded"
+
+
+class WaitlistStatusEnum(str, Enum):
+    """Waitlist status enumeration for API."""
+    PENDING = "pending"
+    NOTIFIED = "notified"
+    BOOKED = "booked"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
 
 
 # Base schemas
@@ -165,6 +174,7 @@ class EventAvailabilityResponse(BaseModel):
     event_id: int = Field(gt=0, description="Event ID must be positive")
     total_capacity: int = Field(ge=0, description="Total capacity must be non-negative")
     available_capacity: int = Field(ge=0, description="Available capacity must be non-negative")
+    price: Decimal = Field(ge=0, description="Event price per ticket")
     utilization_percentage: float = Field(ge=0.0, le=100.0, description="Utilization percentage must be between 0 and 100")
     last_updated: datetime
     
@@ -299,3 +309,138 @@ class BookingStatsResponse(BaseModel):
     conversion_rate: float = Field(..., description="Booking conversion rate")
     period_start: datetime = Field(..., description="Statistics period start")
     period_end: datetime = Field(..., description="Statistics period end")
+
+
+# Waitlist schemas
+class WaitlistJoin(BaseModel):
+    """Schema for joining a waitlist."""
+    
+    event_id: int = Field(..., gt=0, description="ID of the event to join waitlist for")
+    quantity: int = Field(..., gt=0, le=10, description="Number of tickets to waitlist for")
+    notes: Optional[str] = Field(None, max_length=1000, description="Additional notes for the waitlist entry")
+    
+    @field_validator('quantity')
+    @classmethod
+    def validate_quantity(cls, v):
+        """Validate waitlist quantity."""
+        if v <= 0:
+            raise ValueError('Quantity must be greater than 0')
+        if v > 10:
+            raise ValueError('Maximum 10 tickets per waitlist entry')
+        return v
+
+
+class WaitlistCancel(BaseModel):
+    """Schema for cancelling a waitlist entry."""
+    
+    reason: Optional[str] = Field(None, max_length=500, description="Reason for cancellation")
+
+
+class WaitlistEntryResponse(BaseModel):
+    """Schema for waitlist entry response."""
+    
+    id: int
+    user_id: int
+    event_id: int
+    quantity: int
+    priority: int
+    status: WaitlistStatusEnum
+    joined_at: datetime
+    notified_at: Optional[datetime]
+    expires_at: Optional[datetime]
+    booked_at: Optional[datetime]
+    cancelled_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+    version: int
+    notes: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
+class WaitlistSummaryResponse(BaseModel):
+    """Schema for waitlist summary (list view)."""
+    
+    id: int
+    event_id: int
+    quantity: int
+    priority: int
+    status: WaitlistStatusEnum
+    joined_at: datetime
+    expires_at: Optional[datetime]
+    
+    class Config:
+        from_attributes = True
+
+
+class WaitlistJoinResponse(BaseModel):
+    """Schema for waitlist join response."""
+    
+    success: bool = Field(True, description="Waitlist join success")
+    message: str = Field("Successfully joined waitlist", description="Success message")
+    waitlist_entry: WaitlistEntryResponse = Field(..., description="Created waitlist entry details")
+    estimated_position: int = Field(..., description="Estimated position in waitlist")
+
+
+class WaitlistCancelResponse(BaseModel):
+    """Schema for waitlist cancellation response."""
+    
+    success: bool = Field(True, description="Cancellation success")
+    message: str = Field("Waitlist entry cancelled successfully", description="Success message")
+    waitlist_entry: WaitlistEntryResponse = Field(..., description="Cancelled waitlist entry details")
+
+
+class WaitlistListResponse(PaginatedResponse):
+    """Schema for paginated waitlist list response."""
+    
+    items: List[WaitlistSummaryResponse] = Field(..., description="List of waitlist entries")
+
+
+class WaitlistQueryParams(BaseModel):
+    """Schema for waitlist query parameters."""
+    
+    status: Optional[WaitlistStatusEnum] = Field(None, description="Filter by waitlist status")
+    event_id: Optional[int] = Field(None, gt=0, description="Filter by event ID")
+    user_id: Optional[int] = Field(None, gt=0, description="Filter by user ID")
+    page: int = Field(1, ge=1, description="Page number")
+    page_size: int = Field(20, ge=1, le=100, description="Number of items per page")
+    sort_by: str = Field("joined_at", description="Sort field")
+    sort_order: str = Field("asc", pattern="^(asc|desc)$", description="Sort order")
+
+
+class WaitlistAuditLogResponse(BaseModel):
+    """Schema for waitlist audit log response."""
+    
+    id: int
+    action: str
+    field_name: Optional[str]
+    old_value: Optional[str]
+    new_value: Optional[str]
+    changed_by: Optional[int]
+    changed_at: datetime
+    reason: Optional[str]
+    
+    class Config:
+        from_attributes = True
+
+
+class WaitlistStatsResponse(BaseModel):
+    """Schema for waitlist statistics response."""
+    
+    total_waitlist_entries: int = Field(..., description="Total number of waitlist entries")
+    pending_entries: int = Field(..., description="Number of pending waitlist entries")
+    notified_entries: int = Field(..., description="Number of notified waitlist entries")
+    booked_entries: int = Field(..., description="Number of booked waitlist entries")
+    cancelled_entries: int = Field(..., description="Number of cancelled waitlist entries")
+    expired_entries: int = Field(..., description="Number of expired waitlist entries")
+    conversion_rate: float = Field(..., description="Waitlist to booking conversion rate")
+    period_start: datetime = Field(..., description="Statistics period start")
+    period_end: datetime = Field(..., description="Statistics period end")
+
+
+class WaitlistEligibilityResponse(BaseModel):
+    """Schema for waitlist eligibility check response."""
+    
+    can_join: bool = Field(..., description="Whether user can join the waitlist")
+    event_id: int = Field(..., description="Event ID")
