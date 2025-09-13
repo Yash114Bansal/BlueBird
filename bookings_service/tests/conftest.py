@@ -101,7 +101,6 @@ def sample_booking_data():
     return {
         "event_id": 1,
         "quantity": 2,
-        "ticket_type": "General",
         "notes": "Test booking"
     }
 

@@ -23,7 +23,6 @@ from app.services.booking_service import booking_service
 from app.services.availability_service import availability_service
 from app.schemas.booking import (
     BookingCreate, 
-    BookingUpdate, 
     BookingCancel,
     BookingResponse, 
     BookingSummaryResponse,
@@ -326,72 +325,6 @@ async def cancel_booking(
         )
 
 
-@router.put("/{booking_id}", response_model=BookingResponse)
-async def update_booking(
-    booking_update: BookingUpdate,
-    booking_id: int = Path(..., description="Booking ID"),
-    user_id: int = Depends(get_current_user_id),
-    user_role: str = Depends(get_current_user_role),
-    db: Session = Depends(get_db)
-):
-    """
-    Update a booking (limited fields).
-    
-    Args:
-        booking_id: ID of the booking to update
-        booking_update: Update data
-        user_id: Current user ID
-        user_role: Current user role
-        db: Database session
-        
-    Returns:
-        Updated booking details
-        
-    Raises:
-        HTTPException: If update fails
-    """
-    try:
-        # Check permissions
-        is_admin = user_role == "admin"
-        if not is_admin:
-            # Regular users can only update their own bookings
-            await validate_booking_ownership(booking_id, user_id, user_role, db)
-        
-        # Get current booking
-        booking = await booking_service.get_booking_by_id(
-            booking_id=booking_id,
-            user_id=user_id if not is_admin else None,
-            is_admin=is_admin
-        )
-        
-        if not booking:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Booking not found or access denied"
-            )
-        
-        # Update booking fields
-        if booking_update.notes is not None:
-            booking.notes = booking_update.notes
-        
-        if booking_update.status is not None and is_admin:
-            # Only admins can change status
-            booking.status = BookingStatus(booking_update.status.value)
-        
-        # Save changes
-        db.commit()
-        db.refresh(booking)
-        
-        return BookingResponse.from_orm(booking)
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to update booking {booking_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
 
 
 @router.get("/{booking_id}/audit", response_model=List[dict])

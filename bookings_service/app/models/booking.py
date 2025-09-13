@@ -143,7 +143,6 @@ class Booking(Base):
 class BookingItem(Base):
     """
     Individual booking items for detailed tracking.
-    Useful for different ticket types (VIP, General, Student, etc.).
     """
     
     __tablename__ = "booking_items"
@@ -152,7 +151,6 @@ class BookingItem(Base):
     booking_id = Column(Integer, ForeignKey("bookings.id", ondelete="CASCADE"), nullable=False, index=True)
     
     # Item details
-    ticket_type = Column(String(100), nullable=True)
     price_per_item = Column(Numeric(10, 2), nullable=False)
     quantity = Column(Integer, nullable=False)
     total_price = Column(Numeric(10, 2), nullable=False)

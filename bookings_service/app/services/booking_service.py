@@ -17,7 +17,7 @@ from app.core.config import config
 from app.db.database import db_manager
 from app.db.redis_client import redis_manager, get_distributed_lock
 from app.models.booking import Booking, BookingItem, BookingStatus, PaymentStatus, BookingAuditLog
-from app.schemas.booking import BookingCreate, BookingUpdate, BookingCancel
+from app.schemas.booking import BookingCreate, BookingCancel
 from .event_publisher import BookingEventPublisher
 
 logger = logging.getLogger(__name__)
@@ -150,7 +150,6 @@ class BookingService:
                     # Create booking item
                     booking_item = BookingItem(
                         booking_id=booking.id,
-                        ticket_type=booking_data.ticket_type,
                         price_per_item=event_price,
                         quantity=booking_data.quantity,
                         total_price=total_amount

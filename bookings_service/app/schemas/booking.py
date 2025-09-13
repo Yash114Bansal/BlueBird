@@ -48,7 +48,6 @@ class BaseBookingSchema(BaseModel):
 class BookingItemCreate(BaseModel):
     """Schema for creating booking items."""
     
-    ticket_type: Optional[str] = Field(None, max_length=100, description="Type of ticket (VIP, General, etc.)")
     price_per_item: Decimal = Field(..., gt=0, description="Price per individual ticket")
     quantity: int = Field(..., gt=0, le=10, description="Number of tickets (max 10)")
     
@@ -73,7 +72,6 @@ class BookingCreate(BaseModel):
     
     event_id: int = Field(..., gt=0, description="ID of the event to book")
     quantity: int = Field(..., gt=0, le=10, description="Total number of tickets to book")
-    ticket_type: Optional[str] = Field(None, max_length=100, description="Type of tickets")
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes for the booking")
     
     @field_validator('quantity')
@@ -91,7 +89,6 @@ class BookingUpdate(BaseModel):
     """Schema for updating an existing booking."""
     
     notes: Optional[str] = Field(None, max_length=1000, description="Additional notes for the booking")
-    status: Optional[BookingStatusEnum] = Field(None, description="New booking status")
 
 
 class BookingCancel(BaseModel):
@@ -107,7 +104,6 @@ class BookingItemResponse(BaseModel):
     """Schema for booking item response."""
     
     id: int
-    ticket_type: Optional[str]
     price_per_item: float
     quantity: int
     total_price: float

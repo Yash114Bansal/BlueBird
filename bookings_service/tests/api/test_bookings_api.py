@@ -26,7 +26,6 @@ class TestBookingsAPI:
         booking_data = {
             "event_id": 1,
             "quantity": 2,
-            "ticket_type": "General",
             "notes": "Test booking"
         }
         

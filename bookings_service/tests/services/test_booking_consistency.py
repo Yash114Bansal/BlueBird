@@ -112,7 +112,6 @@ class TestSimpleConsistency:
         # Create booking item
         booking_item = BookingItem(
             booking_id=1,
-            ticket_type="General",
             price_per_item=Decimal("25.00"),
             quantity=2,
             total_price=Decimal("50.00")
@@ -120,7 +119,6 @@ class TestSimpleConsistency:
         
         # Verify item properties
         assert booking_item.booking_id == 1
-        assert booking_item.ticket_type == "General"
         assert booking_item.price_per_item == Decimal("25.00")
         assert booking_item.quantity == 2
         assert booking_item.total_price == Decimal("50.00")
