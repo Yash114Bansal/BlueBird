@@ -91,6 +91,7 @@ def sample_event_availability():
         "available_capacity": 100,
         "reserved_capacity": 0,
         "confirmed_capacity": 0,
+        "price": 50.00,
         "version": 1
     }
 

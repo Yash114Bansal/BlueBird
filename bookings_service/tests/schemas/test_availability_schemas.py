@@ -19,6 +19,7 @@ class TestEventAvailabilityResponseSchema:
             "event_id": 1,
             "total_capacity": 100,
             "available_capacity": 75,
+            "price": 50.00,
             "utilization_percentage": 25.0,
             "last_updated": datetime.now(timezone.utc)
         }
@@ -28,6 +29,7 @@ class TestEventAvailabilityResponseSchema:
         assert response.event_id == 1
         assert response.total_capacity == 100
         assert response.available_capacity == 75
+        assert response.price == 50.00
         assert response.utilization_percentage == 25.0
         assert isinstance(response.last_updated, datetime)
     
@@ -172,6 +174,7 @@ class TestEventAvailabilityResponseSchema:
                 self.event_id = 1
                 self.total_capacity = 100
                 self.available_capacity = 75
+                self.price = 50.00
                 self.utilization_percentage = 25.0
                 self.last_updated = datetime.now(timezone.utc)
         
@@ -181,6 +184,7 @@ class TestEventAvailabilityResponseSchema:
         assert response.event_id == 1
         assert response.total_capacity == 100
         assert response.available_capacity == 75
+        assert response.price == 50.00
         assert response.utilization_percentage == 25.0
         assert isinstance(response.last_updated, datetime)
     
@@ -190,6 +194,7 @@ class TestEventAvailabilityResponseSchema:
             "event_id": 1,
             "total_capacity": 100,
             "available_capacity": 75,
+            "price": 50.00,
             "utilization_percentage": 25.0,
             "last_updated": datetime.now(timezone.utc)
         }
@@ -213,6 +218,7 @@ class TestEventAvailabilityResponseSchema:
             "event_id": 1,
             "total_capacity": 100,
             "available_capacity": 75,
+            "price": 50.00,
             "utilization_percentage": 25.0,
             "last_updated": datetime.now(timezone.utc)
         }
