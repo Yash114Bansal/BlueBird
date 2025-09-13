@@ -21,10 +21,12 @@ router = APIRouter(prefix="/api/v1")
 from app.api.v1.bookings import router as bookings_router
 from app.api.v1.availability import router as availability_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.waitlist import router as waitlist_router
 
 router.include_router(bookings_router)
 router.include_router(availability_router)
 router.include_router(admin_router)
+router.include_router(waitlist_router)
 
 
 @router.get("/health", response_model=HealthCheckResponse)
@@ -79,6 +81,7 @@ async def service_info():
         "capabilities": [
             "Booking creation and management",
             "Real-time availability tracking",
+            "Waitlist management and notifications",
             "Distributed locking for consistency",
             "Audit trail and compliance",
             "Admin management tools"
@@ -86,6 +89,7 @@ async def service_info():
         "endpoints": {
             "bookings": "/api/v1/bookings",
             "availability": "/api/v1/availability",
+            "waitlist": "/api/v1/waitlist",
             "admin": "/api/v1/admin",
             "health": "/api/v1/health",
             "docs": "/docs"
