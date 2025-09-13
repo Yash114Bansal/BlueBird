@@ -18,6 +18,7 @@ from app.db.database import db_manager
 from app.db.redis_client import redis_manager, get_distributed_lock
 from app.models.booking import Booking, BookingItem, BookingStatus, PaymentStatus, BookingAuditLog
 from app.schemas.booking import BookingCreate, BookingUpdate, BookingCancel
+from .event_publisher import BookingEventPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class BookingService:
     def __init__(self):
         self.consistency_config = None
         self.booking_config = None
+        self.event_publisher = None
     
     async def _get_configs(self):
         """Get configuration settings."""
@@ -38,6 +40,13 @@ class BookingService:
             self.consistency_config = await config.get_consistency_config()
         if not self.booking_config:
             self.booking_config = await config.get_booking_config()
+    
+    async def _get_event_publisher(self):
+        """Get event publisher instance."""
+        if not self.event_publisher:
+            await redis_manager.initialize()
+            self.event_publisher = BookingEventPublisher(redis_manager)
+        return self.event_publisher
     
     async def _generate_booking_reference(self) -> str:
         """Generate unique booking reference."""
@@ -164,6 +173,13 @@ class BookingService:
                     # Explicitly load booking_items to avoid lazy loading issues
                     _ = booking.booking_items
                     
+                    # Publish booking created event
+                    try:
+                        publisher = await self._get_event_publisher()
+                        await publisher.publish_booking_created(booking)
+                    except Exception as e:
+                        logger.error(f"Failed to publish booking created event: {e}")
+                    
                     logger.info(f"Booking created successfully: {booking_reference}")
                     return booking, True
                     
@@ -285,6 +301,16 @@ class BookingService:
                     
                     session.commit()
                     
+                    # Eagerly load booking_items to avoid DetachedInstanceError
+                    _ = booking.booking_items
+                    
+                    # Publish booking confirmed event
+                    try:
+                        publisher = await self._get_event_publisher()
+                        await publisher.publish_booking_confirmed(booking)
+                    except Exception as e:
+                        logger.error(f"Failed to publish booking confirmed event: {e}")
+                    
                     logger.info(f"Booking confirmed: {booking.booking_reference}")
                     return booking, True
                     
@@ -354,17 +380,21 @@ class BookingService:
                     booking.cancelled_at = datetime.now(timezone.utc)
                     booking.version += 1
                     
-                    # Release capacity based on current status
-                    if booking.status == BookingStatus.PENDING:
+                    # Release capacity based on previous status
+                    if old_status == BookingStatus.PENDING.value:
                         # Release reserved capacity
+                        logger.info(f"Releasing reserved capacity for event {booking.event_id}, quantity: {booking.quantity}")
                         await self._release_reserved_capacity(
                             session, booking.event_id, booking.quantity
                         )
-                    elif booking.status == BookingStatus.CONFIRMED:
+                    elif old_status == BookingStatus.CONFIRMED.value:
                         # Release confirmed capacity
+                        logger.info(f"Releasing confirmed capacity for event {booking.event_id}, quantity: {booking.quantity}")
                         await self._release_confirmed_capacity(
                             session, booking.event_id, booking.quantity
                         )
+                    else:
+                        logger.warning(f"Booking {booking_id} had status {old_status}, no capacity to release")
                     
                     # Create audit log
                     await self._create_audit_log(
@@ -377,6 +407,16 @@ class BookingService:
                     )
                     
                     session.commit()
+                    
+                    # Eagerly load booking_items to avoid DetachedInstanceError
+                    _ = booking.booking_items
+                    
+                    # Publish booking cancelled event
+                    try:
+                        publisher = await self._get_event_publisher()
+                        await publisher.publish_booking_cancelled(booking)
+                    except Exception as e:
+                        logger.error(f"Failed to publish booking cancelled event: {e}")
                     
                     logger.info(f"Booking cancelled: {booking.booking_reference}")
                     return booking, True
@@ -394,13 +434,27 @@ class BookingService:
         """Release reserved capacity back to available."""
         from app.models.booking import EventAvailability
         
-        session.query(EventAvailability).filter(
+        # Get current availability before update
+        availability = session.query(EventAvailability).filter(
             EventAvailability.event_id == event_id
-        ).update({
-            EventAvailability.reserved_capacity: EventAvailability.reserved_capacity - quantity,
-            EventAvailability.available_capacity: EventAvailability.available_capacity + quantity,
-            EventAvailability.version: EventAvailability.version + 1
-        })
+        ).first()
+        
+        if availability:
+            logger.info(f"Before releasing reserved capacity - Event {event_id}: reserved={availability.reserved_capacity}, available={availability.available_capacity}")
+            
+            session.query(EventAvailability).filter(
+                EventAvailability.event_id == event_id
+            ).update({
+                EventAvailability.reserved_capacity: EventAvailability.reserved_capacity - quantity,
+                EventAvailability.available_capacity: EventAvailability.available_capacity + quantity,
+                EventAvailability.version: EventAvailability.version + 1
+            })
+            
+            # Refresh and log after update
+            session.refresh(availability)
+            logger.info(f"After releasing reserved capacity - Event {event_id}: reserved={availability.reserved_capacity}, available={availability.available_capacity}")
+        else:
+            logger.error(f"EventAvailability not found for event {event_id}")
     
     async def _release_confirmed_capacity(
         self, 
@@ -411,13 +465,27 @@ class BookingService:
         """Release confirmed capacity back to available."""
         from app.models.booking import EventAvailability
         
-        session.query(EventAvailability).filter(
+        # Get current availability before update
+        availability = session.query(EventAvailability).filter(
             EventAvailability.event_id == event_id
-        ).update({
-            EventAvailability.confirmed_capacity: EventAvailability.confirmed_capacity - quantity,
-            EventAvailability.available_capacity: EventAvailability.available_capacity + quantity,
-            EventAvailability.version: EventAvailability.version + 1
-        })
+        ).first()
+        
+        if availability:
+            logger.info(f"Before releasing confirmed capacity - Event {event_id}: confirmed={availability.confirmed_capacity}, available={availability.available_capacity}")
+            
+            session.query(EventAvailability).filter(
+                EventAvailability.event_id == event_id
+            ).update({
+                EventAvailability.confirmed_capacity: EventAvailability.confirmed_capacity - quantity,
+                EventAvailability.available_capacity: EventAvailability.available_capacity + quantity,
+                EventAvailability.version: EventAvailability.version + 1
+            })
+            
+            # Refresh and log after update
+            session.refresh(availability)
+            logger.info(f"After releasing confirmed capacity - Event {event_id}: confirmed={availability.confirmed_capacity}, available={availability.available_capacity}")
+        else:
+            logger.error(f"EventAvailability not found for event {event_id}")
     
     async def get_booking_by_id(
         self, 

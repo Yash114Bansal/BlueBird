@@ -294,6 +294,29 @@ class RedisManager:
         except Exception as e:
             logger.error(f"Redis health check failed: {e}")
             return False
+    
+    # Pub/Sub Operations for Event Publishing
+    async def publish(self, channel: str, message: str) -> int:
+        """
+        Publish a message to a Redis channel.
+        
+        Args:
+            channel: Redis channel name
+            message: Message to publish
+            
+        Returns:
+            Number of clients that received the message
+        """
+        if not self._initialized:
+            await self.initialize()
+        
+        try:
+            result = await self.redis_client.publish(channel, message)
+            logger.debug(f"Published message to channel {channel}: {result} clients received")
+            return result
+        except Exception as e:
+            logger.error(f"Redis publish error for channel {channel}: {e}")
+            return 0
 
 
 # Global Redis manager instance

@@ -30,11 +30,13 @@ class EventPublisher:
         try:
             channel = f"{self.channel_prefix}:created"
             message = {
-                "type": "event.created",
+                "type": "EventCreated",
                 "event_id": event.id,
                 "event_data": {
                     "id": event.id,
+                    "name": event.title,  # Analytics service expects 'name' field
                     "title": event.title,
+                    "category": getattr(event, 'category', None),
                     "capacity": event.capacity,
                     "price": float(event.price) if event.price else 0.0,
                     "event_date": event.event_date.isoformat() if event.event_date else None,
@@ -43,10 +45,10 @@ class EventPublisher:
             }
             
             await self.cache_manager.redis.publish(channel, json.dumps(message))
-            logger.info(f"Published event.created for event {event.id}")
+            logger.info(f"Published EventCreated for event {event.id}")
             
         except Exception as e:
-            logger.error(f"Failed to publish event.created: {e}")
+            logger.error(f"Failed to publish EventCreated: {e}")
     
     async def publish_event_updated(self, event):
         """
@@ -58,11 +60,13 @@ class EventPublisher:
         try:
             channel = f"{self.channel_prefix}:updated"
             message = {
-                "type": "event.updated",
+                "type": "EventUpdated",
                 "event_id": event.id,
                 "event_data": {
                     "id": event.id,
+                    "name": event.title,  
                     "title": event.title,
+                    "category": getattr(event, 'category', None),
                     "capacity": event.capacity,
                     "price": float(event.price) if event.price else 0.0,
                     "event_date": event.event_date.isoformat() if event.event_date else None,
@@ -71,10 +75,10 @@ class EventPublisher:
             }
             
             await self.cache_manager.redis.publish(channel, json.dumps(message))
-            logger.info(f"Published event.updated for event {event.id}")
+            logger.info(f"Published EventUpdated for event {event.id}")
             
         except Exception as e:
-            logger.error(f"Failed to publish event.updated: {e}")
+            logger.error(f"Failed to publish EventUpdated: {e}")
     
     async def publish_event_deleted(self, event_id: int):
         """
@@ -86,12 +90,12 @@ class EventPublisher:
         try:
             channel = f"{self.channel_prefix}:deleted"
             message = {
-                "type": "event.deleted",
+                "type": "EventDeleted",
                 "event_id": event_id
             }
             
             await self.cache_manager.redis.publish(channel, json.dumps(message))
-            logger.info(f"Published event.deleted for event {event_id}")
+            logger.info(f"Published EventDeleted for event {event_id}")
             
         except Exception as e:
-            logger.error(f"Failed to publish event.deleted: {e}")
+            logger.error(f"Failed to publish EventDeleted: {e}")
