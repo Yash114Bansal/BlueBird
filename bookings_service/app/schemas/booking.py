@@ -165,8 +165,6 @@ class EventAvailabilityResponse(BaseModel):
     event_id: int
     total_capacity: int
     available_capacity: int
-    reserved_capacity: int
-    confirmed_capacity: int
     utilization_percentage: float
     last_updated: datetime
     

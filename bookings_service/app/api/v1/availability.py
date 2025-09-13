@@ -264,9 +264,7 @@ async def update_event_capacity(
             data={
                 "event_id": availability.event_id,
                 "total_capacity": availability.total_capacity,
-                "available_capacity": availability.available_capacity,
-                "reserved_capacity": availability.reserved_capacity,
-                "confirmed_capacity": availability.confirmed_capacity
+                "available_capacity": availability.available_capacity
             }
         )
         
@@ -325,7 +323,6 @@ async def reserve_capacity(
                 "event_id": event_id,
                 "reserved_quantity": quantity,
                 "available_capacity": availability.available_capacity,
-                "reserved_capacity": availability.reserved_capacity,
                 "version": availability.version
             }
         }
@@ -385,8 +382,6 @@ async def release_capacity(
                 "released_quantity": quantity,
                 "capacity_type": capacity_type,
                 "available_capacity": availability.available_capacity,
-                "reserved_capacity": availability.reserved_capacity,
-                "confirmed_capacity": availability.confirmed_capacity,
                 "version": availability.version
             }
         }
