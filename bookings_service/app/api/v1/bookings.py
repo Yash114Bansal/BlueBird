@@ -66,9 +66,13 @@ async def create_booking(
         client_ip = user_info["client_ip"]
         user_agent = user_info["user_agent"]
         
-        # TODO: Get event price from events service
-        # For now, using a default price
-        event_price = 50.00  # This should come from events service
+        # Get event price from EventAvailability
+        event_price = await booking_service.get_event_price(booking_data.event_id)
+        if event_price is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Event not found or not available for booking"
+            )
         
         # Create booking with high consistency
         booking, success = await booking_service.create_booking(
