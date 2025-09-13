@@ -9,7 +9,7 @@ import logging
 from typing import Dict, Any
 from ..db.redis_client import redis_manager
 from ..db.database import db_manager
-from ..models.booking import EventAvailability
+from ..models.booking import EventAvailability, WaitlistEntry, WaitlistStatus
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,16 @@ class EventSubscriber:
                 f"{self.channel_prefix}:deleted"
             ]
             
-            await self.pubsub.subscribe(*channels)
+            # Subscribe to waitlist channels
+            waitlist_channels = [
+                "evently:bookings:waitlist_joined",
+                "evently:bookings:waitlist_cancelled",
+                "evently:bookings:waitlist_notifications_sent"
+            ]
+            
+            all_channels = channels + waitlist_channels
+            
+            await self.pubsub.subscribe(*all_channels)
             self.running = True
             
             logger.info("Event subscriber started, listening for events...")
@@ -96,6 +105,12 @@ class EventSubscriber:
                 await self._handle_event_updated(data)
             elif event_type == 'EventDeleted':
                 await self._handle_event_deleted(event_id)
+            elif event_type == 'WaitlistJoined':
+                await self._handle_waitlist_joined(data)
+            elif event_type == 'WaitlistCancelled':
+                await self._handle_waitlist_cancelled(data)
+            elif event_type == 'WaitlistNotificationsSent':
+                await self._handle_waitlist_notifications_sent(data)
             else:
                 logger.warning(f"Unknown event type: {event_type}")
                 
@@ -108,6 +123,7 @@ class EventSubscriber:
             event_data = data.get('event_data', {})
             event_id = event_data.get('id')
             capacity = event_data.get('capacity', 0)
+            price = event_data.get('price', 0.00)
             
             if not event_id:
                 logger.error("Event ID missing in EventCreated data")
@@ -131,6 +147,7 @@ class EventSubscriber:
                     available_capacity=capacity,
                     reserved_capacity=0,
                     confirmed_capacity=0,
+                    price=price,
                     version=1,
                     last_updated=datetime.now(timezone.utc)
                 )
@@ -138,7 +155,7 @@ class EventSubscriber:
                 session.add(availability)
                 session.commit()
                 
-                logger.info(f"Created EventAvailability for event {event_id} with capacity {capacity}")
+                logger.info(f"Created EventAvailability for event {event_id} with capacity {capacity} and price {price}")
                 
         except Exception as e:
             logger.error(f"Error handling EventCreated: {e}")
@@ -149,6 +166,7 @@ class EventSubscriber:
             event_data = data.get('event_data', {})
             event_id = event_data.get('id')
             new_capacity = event_data.get('capacity')
+            new_price = event_data.get('price')
             
             if not event_id or new_capacity is None:
                 logger.error("Event ID or capacity missing in EventUpdated data")
@@ -169,6 +187,7 @@ class EventSubscriber:
                         available_capacity=new_capacity,
                         reserved_capacity=0,
                         confirmed_capacity=0,
+                        price=new_price or 0.00,
                         version=1,
                         last_updated=datetime.now(timezone.utc)
                     )
@@ -180,11 +199,16 @@ class EventSubscriber:
                     
                     availability.total_capacity = new_capacity
                     availability.available_capacity = max(0, availability.available_capacity + capacity_diff)
+                    
+                    # Update price if provided
+                    if new_price is not None:
+                        availability.price = new_price
+                    
                     availability.version += 1
                     availability.last_updated = datetime.now(timezone.utc)
                 
                 session.commit()
-                logger.info(f"Updated EventAvailability for event {event_id} to capacity {new_capacity}")
+                logger.info(f"Updated EventAvailability for event {event_id} to capacity {new_capacity} and price {new_price}")
                 
         except Exception as e:
             logger.error(f"Error handling EventUpdated: {e}")
@@ -207,6 +231,59 @@ class EventSubscriber:
                     
         except Exception as e:
             logger.error(f"Error handling EventDeleted: {e}")
+    
+    async def _handle_waitlist_joined(self, data: Dict[str, Any]):
+        """Handle waitlist joined notification."""
+        try:
+            waitlist_data = data.get('waitlist_data', {})
+            event_id = waitlist_data.get('event_id')
+            user_id = waitlist_data.get('user_id')
+            
+            if not event_id or not user_id:
+                logger.error("Event ID or user ID missing in WaitlistJoined data")
+                return
+            
+            logger.info(f"User {user_id} joined waitlist for event {event_id}")
+            
+            # Could add analytics or other processing here
+            
+        except Exception as e:
+            logger.error(f"Error handling WaitlistJoined: {e}")
+    
+    async def _handle_waitlist_cancelled(self, data: Dict[str, Any]):
+        """Handle waitlist cancelled notification."""
+        try:
+            waitlist_data = data.get('waitlist_data', {})
+            event_id = waitlist_data.get('event_id')
+            user_id = waitlist_data.get('user_id')
+            
+            if not event_id or not user_id:
+                logger.error("Event ID or user ID missing in WaitlistCancelled data")
+                return
+            
+            logger.info(f"User {user_id} cancelled waitlist for event {event_id}")
+            
+            # Could add analytics or other processing here
+            
+        except Exception as e:
+            logger.error(f"Error handling WaitlistCancelled: {e}")
+    
+    async def _handle_waitlist_notifications_sent(self, data: Dict[str, Any]):
+        """Handle waitlist notifications sent notification."""
+        try:
+            event_id = data.get('event_id')
+            notifications_sent = data.get('notifications_sent', 0)
+            
+            if not event_id:
+                logger.error("Event ID missing in WaitlistNotificationsSent data")
+                return
+            
+            logger.info(f"Sent {notifications_sent} waitlist notifications for event {event_id}")
+            
+            # Could add analytics or other processing here
+            
+        except Exception as e:
+            logger.error(f"Error handling WaitlistNotificationsSent: {e}")
 
 
 # Global subscriber instance

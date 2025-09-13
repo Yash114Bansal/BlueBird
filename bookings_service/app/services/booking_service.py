@@ -19,6 +19,7 @@ from app.db.redis_client import redis_manager, get_distributed_lock
 from app.models.booking import Booking, BookingItem, BookingStatus, PaymentStatus, BookingAuditLog
 from app.schemas.booking import BookingCreate, BookingCancel
 from .event_publisher import BookingEventPublisher
+from .waitlist_service import waitlist_service
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,34 @@ class BookingService:
     async def _generate_booking_reference(self) -> str:
         """Generate unique booking reference."""
         return f"BK-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
+    
+    async def get_event_price(self, event_id: int) -> Optional[Decimal]:
+        """
+        Get event price from EventAvailability.
+        
+        Args:
+            event_id: ID of the event
+            
+        Returns:
+            Event price or None if event not found
+        """
+        try:
+            from app.models.booking import EventAvailability
+            
+            with db_manager.get_session() as session:
+                availability = session.query(EventAvailability).filter(
+                    EventAvailability.event_id == event_id
+                ).first()
+                
+                if availability:
+                    return availability.price
+                else:
+                    logger.warning(f"EventAvailability not found for event {event_id}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error getting event price for event {event_id}: {e}")
+            return None
     
     async def _create_audit_log(
         self, 
@@ -417,6 +446,16 @@ class BookingService:
                     except Exception as e:
                         logger.error(f"Failed to publish booking cancelled event: {e}")
                     
+                    # Notify waitlist entries if capacity was released
+                    try:
+                        if old_status in [BookingStatus.PENDING.value, BookingStatus.CONFIRMED.value]:
+                            await waitlist_service.notify_next_waitlist_entries(
+                                event_id=booking.event_id,
+                                available_quantity=booking.quantity
+                            )
+                    except Exception as e:
+                        logger.error(f"Failed to notify waitlist entries after booking cancellation: {e}")
+                    
                     logger.info(f"Booking cancelled: {booking.booking_reference}")
                     return booking, True
                     
@@ -601,6 +640,16 @@ class BookingService:
                 
                 if expired_count > 0:
                     logger.info(f"Expired {expired_count} pending bookings")
+                    
+                    # Notify waitlist entries for events that had expired bookings
+                    try:
+                        for booking in expired_bookings:
+                            await waitlist_service.notify_next_waitlist_entries(
+                                event_id=booking.event_id,
+                                available_quantity=booking.quantity
+                            )
+                    except Exception as e:
+                        logger.error(f"Failed to notify waitlist entries after booking expiry: {e}")
                 
                 return expired_count
                 

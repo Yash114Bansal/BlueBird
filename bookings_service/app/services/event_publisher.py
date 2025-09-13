@@ -190,3 +190,113 @@ class BookingEventPublisher:
             
         except Exception as e:
             logger.error(f"Failed to publish BookingPaymentCompleted: {e}")
+    
+    async def publish_waitlist_joined(self, waitlist_entry):
+        """
+        Publish waitlist joined notification.
+        
+        Args:
+            waitlist_entry: WaitlistEntry object to publish
+        """
+        try:
+            channel = f"{self.channel_prefix}:waitlist_joined"
+            message = {
+                "type": "WaitlistJoined",
+                "waitlist_entry_id": waitlist_entry.id,
+                "event_id": waitlist_entry.event_id,
+                "user_id": waitlist_entry.user_id,
+                "waitlist_data": {
+                    "id": waitlist_entry.id,
+                    "event_id": waitlist_entry.event_id,
+                    "user_id": waitlist_entry.user_id,
+                    "quantity": waitlist_entry.quantity,
+                    "priority": waitlist_entry.priority,
+                    "status": waitlist_entry.status.value if waitlist_entry.status else None,
+                    "joined_at": waitlist_entry.joined_at.isoformat() if waitlist_entry.joined_at else None,
+                    "created_at": waitlist_entry.created_at.isoformat() if waitlist_entry.created_at else None
+                }
+            }
+            
+            await self.redis_manager.publish(channel, json.dumps(message))
+            logger.info(f"Published WaitlistJoined for waitlist entry {waitlist_entry.id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to publish WaitlistJoined: {e}")
+    
+    async def publish_waitlist_cancelled(self, waitlist_entry):
+        """
+        Publish waitlist cancelled notification.
+        
+        Args:
+            waitlist_entry: WaitlistEntry object to publish
+        """
+        try:
+            channel = f"{self.channel_prefix}:waitlist_cancelled"
+            message = {
+                "type": "WaitlistCancelled",
+                "waitlist_entry_id": waitlist_entry.id,
+                "event_id": waitlist_entry.event_id,
+                "user_id": waitlist_entry.user_id,
+                "waitlist_data": {
+                    "id": waitlist_entry.id,
+                    "event_id": waitlist_entry.event_id,
+                    "user_id": waitlist_entry.user_id,
+                    "quantity": waitlist_entry.quantity,
+                    "priority": waitlist_entry.priority,
+                    "status": waitlist_entry.status.value if waitlist_entry.status else None,
+                    "cancelled_at": waitlist_entry.cancelled_at.isoformat() if waitlist_entry.cancelled_at else None,
+                    "updated_at": waitlist_entry.updated_at.isoformat() if waitlist_entry.updated_at else None
+                }
+            }
+            
+            await self.redis_manager.publish(channel, json.dumps(message))
+            logger.info(f"Published WaitlistCancelled for waitlist entry {waitlist_entry.id}")
+            
+        except Exception as e:
+            logger.error(f"Failed to publish WaitlistCancelled: {e}")
+    
+    async def publish_waitlist_notifications_sent(self, event_id: int, count: int):
+        """
+        Publish waitlist notifications sent notification.
+        
+        Args:
+            event_id: ID of the event
+            count: Number of notifications sent
+        """
+        try:
+            channel = f"{self.channel_prefix}:waitlist_notifications_sent"
+            message = {
+                "type": "WaitlistNotificationsSent",
+                "event_id": event_id,
+                "notifications_sent": count,
+                "timestamp": json.dumps({"timestamp": "now"})  # Will be replaced with actual timestamp
+            }
+            
+            await self.redis_manager.publish(channel, json.dumps(message))
+            logger.info(f"Published WaitlistNotificationsSent for event {event_id}, count: {count}")
+            
+        except Exception as e:
+            logger.error(f"Failed to publish WaitlistNotificationsSent: {e}")
+    
+    async def publish_waitlist_availability_updated(self, event_id: int, available_capacity: int):
+        """
+        Publish waitlist availability updated notification.
+        
+        Args:
+            event_id: ID of the event
+            available_capacity: Available capacity for waitlist
+        """
+        try:
+            channel = f"{self.channel_prefix}:waitlist_availability_updated"
+            message = {
+                "type": "WaitlistAvailabilityUpdated",
+                "event_id": event_id,
+                "available_capacity": available_capacity,
+                "timestamp": json.dumps({"timestamp": "now"})  # Will be replaced with actual timestamp
+            }
+            
+            await self.redis_manager.publish(channel, json.dumps(message))
+            logger.info(f"Published WaitlistAvailabilityUpdated for event {event_id}, capacity: {available_capacity}")
+            
+        except Exception as e:
+            logger.error(f"Failed to publish WaitlistAvailabilityUpdated: {e}")
