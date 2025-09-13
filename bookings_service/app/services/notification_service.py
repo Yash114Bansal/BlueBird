@@ -126,6 +126,7 @@ class NotificationService:
                 return True
             
             logger.info(f"Sending booking confirmation to user {user_id}")
+            logger.debug(f"Booking confirmation data: {booking_data}")
             
             # Prepare task data
             task_data = {
@@ -172,6 +173,7 @@ class NotificationService:
                 return True
             
             logger.info(f"Sending booking cancellation to user {user_id}")
+            logger.debug(f"Booking cancellation data: {booking_data}")
             
             # Prepare task data
             task_data = {
@@ -218,6 +220,7 @@ class NotificationService:
                 return True
             
             logger.info(f"Sending waitlist notification to user {user_id}")
+            logger.debug(f"Waitlist notification data: {waitlist_data}")
             
             # Calculate expiry minutes
             expiry_minutes = 30  # Default
@@ -269,6 +272,7 @@ class NotificationService:
                 return True
             
             logger.info(f"Sending waitlist joined notification to user {user_id}")
+            logger.debug(f"Waitlist joined data: {waitlist_data}")
             
             # Prepare task data
             task_data = {
@@ -312,6 +316,7 @@ class NotificationService:
                 return True
             
             logger.info(f"Sending waitlist cancellation to user {user_id}")
+            logger.debug(f"Waitlist cancellation data: {waitlist_data}")
             
             # Prepare task data
             task_data = {

@@ -46,6 +46,18 @@ def override_get_db():
 app.dependency_overrides[get_db] = override_get_db
 
 
+@pytest.fixture(scope="session", autouse=True)
+def initialize_db_manager():
+    """Initialize database manager for tests."""
+    import asyncio
+    
+    # Initialize the database manager with test configuration
+    asyncio.run(db_manager.initialize())
+    yield
+    # Cleanup
+    asyncio.run(db_manager.close())
+
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for the test session."""
