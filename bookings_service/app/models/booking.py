@@ -184,6 +184,9 @@ class EventAvailability(Base):
     id = Column(Integer, primary_key=True, index=True)
     event_id = Column(Integer, unique=True, nullable=False, index=True)
     
+    # Event information
+    event_name = Column(String(255), nullable=True) 
+    
     # Capacity tracking
     total_capacity = Column(Integer, nullable=False)
     available_capacity = Column(Integer, nullable=False)

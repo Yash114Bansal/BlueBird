@@ -190,17 +190,6 @@ class BookingsConfig:
             "enable_duplicate_prevention": await self.secrets_manager.get_secret("ENABLE_DUPLICATE_PREVENTION") != "false"
         }
     
-    async def get_waitlist_config(self) -> Dict[str, Any]:
-        """Get waitlist-specific configuration."""
-        return {
-            "max_waitlist_quantity": int(await self.secrets_manager.get_secret("MAX_WAITLIST_QUANTITY") or "10"),
-            "notification_expiry_minutes": int(await self.secrets_manager.get_secret("WAITLIST_NOTIFICATION_EXPIRY_MINUTES") or "30"),
-            "enable_waitlist_validation": await self.secrets_manager.get_secret("ENABLE_WAITLIST_VALIDATION") != "false",
-            "enable_waitlist_notifications": await self.secrets_manager.get_secret("ENABLE_WAITLIST_NOTIFICATIONS") != "false",
-            "enable_duplicate_waitlist_prevention": await self.secrets_manager.get_secret("ENABLE_DUPLICATE_WAITLIST_PREVENTION") != "false",
-            "max_waitlist_entries_per_user": int(await self.secrets_manager.get_secret("MAX_WAITLIST_ENTRIES_PER_USER") or "5")
-        }
-    
     async def get_database_config(self) -> Dict[str, Any]:
         """Get database-specific configuration for high consistency."""
         return {
@@ -210,6 +199,14 @@ class BookingsConfig:
             "pool_recycle": int(await self.secrets_manager.get_secret("DB_POOL_RECYCLE") or "3600"),
             "isolation_level": await self.secrets_manager.get_secret("DB_ISOLATION_LEVEL") or "READ_COMMITTED",
             "enable_autocommit": await self.secrets_manager.get_secret("DB_ENABLE_AUTOCOMMIT") == "false"
+        }
+    
+    async def get_waitlist_config(self) -> Dict[str, Any]:
+        """Get waitlist-specific configuration."""
+        return {
+            
+            "notification_expiry_minutes": int(await self.secrets_manager.get_secret("WAITLIST_TTL") or "30"),
+            "waitlist_max_size": int(await self.secrets_manager.get_secret("WAITLIST_MAX_SIZE") or "1000"),
         }
     
     async def close(self):

@@ -11,6 +11,9 @@ alembic
 # Redis
 redis[hiredis]
 
+# Celery for task queue
+celery[redis]
+
 # Authentication and security
 python-jose[cryptography]
 passlib[bcrypt]

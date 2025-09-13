@@ -122,6 +122,7 @@ class EventSubscriber:
         try:
             event_data = data.get('event_data', {})
             event_id = event_data.get('id')
+            event_name = event_data.get('name')  # Get event name from published data
             capacity = event_data.get('capacity', 0)
             price = event_data.get('price', 0.00)
             
@@ -137,12 +138,17 @@ class EventSubscriber:
                 ).first()
                 
                 if existing:
-                    logger.info(f"EventAvailability already exists for event {event_id}")
+                    # Update existing record with event name if it's missing
+                    if not existing.event_name and event_name:
+                        existing.event_name = event_name
+                        session.commit()
+                        logger.info(f"Updated EventAvailability with event name for event {event_id}")
                     return
                 
                 # Create new availability record
                 availability = EventAvailability(
                     event_id=event_id,
+                    event_name=event_name,  # Store event name
                     total_capacity=capacity,
                     available_capacity=capacity,
                     reserved_capacity=0,
@@ -165,6 +171,7 @@ class EventSubscriber:
         try:
             event_data = data.get('event_data', {})
             event_id = event_data.get('id')
+            event_name = event_data.get('name')  # Get event name from updated data
             new_capacity = event_data.get('capacity')
             new_price = event_data.get('price')
             
@@ -183,6 +190,7 @@ class EventSubscriber:
                     # Create new availability record
                     availability = EventAvailability(
                         event_id=event_id,
+                        event_name=event_name,  
                         total_capacity=new_capacity,
                         available_capacity=new_capacity,
                         reserved_capacity=0,
@@ -199,6 +207,10 @@ class EventSubscriber:
                     
                     availability.total_capacity = new_capacity
                     availability.available_capacity = max(0, availability.available_capacity + capacity_diff)
+                    
+                    # Update event name if provided
+                    if event_name:
+                        availability.event_name = event_name
                     
                     # Update price if provided
                     if new_price is not None:

@@ -16,10 +16,11 @@ import logging
 from app.core.config import config
 from app.db.database import db_manager
 from app.db.redis_client import redis_manager, get_distributed_lock
-from app.models.booking import Booking, BookingItem, BookingStatus, PaymentStatus, BookingAuditLog
+from app.models.booking import Booking, BookingItem, BookingStatus, PaymentStatus, BookingAuditLog, EventAvailability
 from app.schemas.booking import BookingCreate, BookingCancel
 from .event_publisher import BookingEventPublisher
 from .waitlist_service import waitlist_service
+from .notification_service import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -339,6 +340,23 @@ class BookingService:
                     except Exception as e:
                         logger.error(f"Failed to publish booking confirmed event: {e}")
                     
+                    # Send booking confirmation notification
+                    try:
+                        # Get event name from availability database
+                        event_name = await self._get_event_name(booking.event_id)
+                        await notification_service.send_booking_confirmation(
+                            user_id=booking.user_id,
+                            booking_data={
+                                'id': booking.id,
+                                'event_name': event_name,  # Include actual event name
+                                'quantity': booking.quantity,
+                                'total_amount': float(booking.total_amount),
+                                'created_at': booking.created_at.isoformat()
+                            }
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to send booking confirmation notification: {e}")
+                    
                     logger.info(f"Booking confirmed: {booking.booking_reference}")
                     return booking, True
                     
@@ -656,6 +674,32 @@ class BookingService:
         except Exception as e:
             logger.error(f"Failed to expire pending bookings: {e}")
             return 0
+    
+    async def _get_event_name(self, event_id: int) -> str:
+        """
+        Get event name from EventAvailability table.
+        
+        Args:
+            event_id: Event ID
+            
+        Returns:
+            Event name or generic fallback
+        """
+        try:
+            with db_manager.get_session() as session:
+                availability = session.query(EventAvailability).filter(
+                    EventAvailability.event_id == event_id
+                ).first()
+                
+                if availability and availability.event_name:
+                    return availability.event_name
+                else:
+                    return f"Event {event_id}"  # Fallback
+                    
+        except Exception as e:
+            logger.error(f"Failed to get event name for event {event_id}: {e}")
+            return f"Event {event_id}"  # Fallback
+    
 
 
 # Global service instance

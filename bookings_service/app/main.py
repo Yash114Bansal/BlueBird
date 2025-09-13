@@ -18,6 +18,7 @@ from app.db.database import db_manager
 from app.db.redis_client import redis_manager
 from app.api.v1.router import router as api_router
 from app.services.event_subscriber import event_subscriber
+from app.services.notification_service import notification_service
 
 # Configure logging
 logging.basicConfig(
@@ -35,7 +36,9 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Starting Bookings Service...")
-    
+
+    logger.info("Celery app initialized for notification dispatch")
+
     try:
         # Initialize database
         await db_manager.initialize()
@@ -52,6 +55,10 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning(f"Database tables may already exist: {e}")
             # Continue startup even if tables already exist
+        
+        # Initialize notification service
+        await notification_service._initialize_celery()
+        logger.info("Notification service initialized")
         
         # Start event subscriber
         await event_subscriber.start()
