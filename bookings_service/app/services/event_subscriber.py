@@ -90,11 +90,11 @@ class EventSubscriber:
             
             logger.info(f"Received event: {event_type} for event {event_id}")
             
-            if event_type == 'event.created':
+            if event_type == 'EventCreated':
                 await self._handle_event_created(data)
-            elif event_type == 'event.updated':
+            elif event_type == 'EventUpdated':
                 await self._handle_event_updated(data)
-            elif event_type == 'event.deleted':
+            elif event_type == 'EventDeleted':
                 await self._handle_event_deleted(event_id)
             else:
                 logger.warning(f"Unknown event type: {event_type}")
@@ -110,7 +110,7 @@ class EventSubscriber:
             capacity = event_data.get('capacity', 0)
             
             if not event_id:
-                logger.error("Event ID missing in event.created data")
+                logger.error("Event ID missing in EventCreated data")
                 return
             
             # Create EventAvailability record
@@ -141,7 +141,7 @@ class EventSubscriber:
                 logger.info(f"Created EventAvailability for event {event_id} with capacity {capacity}")
                 
         except Exception as e:
-            logger.error(f"Error handling event.created: {e}")
+            logger.error(f"Error handling EventCreated: {e}")
     
     async def _handle_event_updated(self, data: Dict[str, Any]):
         """Handle event updated notification."""
@@ -151,7 +151,7 @@ class EventSubscriber:
             new_capacity = event_data.get('capacity')
             
             if not event_id or new_capacity is None:
-                logger.error("Event ID or capacity missing in event.updated data")
+                logger.error("Event ID or capacity missing in EventUpdated data")
                 return
             
             # Update EventAvailability record
@@ -187,7 +187,7 @@ class EventSubscriber:
                 logger.info(f"Updated EventAvailability for event {event_id} to capacity {new_capacity}")
                 
         except Exception as e:
-            logger.error(f"Error handling event.updated: {e}")
+            logger.error(f"Error handling EventUpdated: {e}")
     
     async def _handle_event_deleted(self, event_id: int):
         """Handle event deleted notification."""
@@ -206,7 +206,7 @@ class EventSubscriber:
                     logger.info(f"EventAvailability not found for deleted event {event_id}")
                     
         except Exception as e:
-            logger.error(f"Error handling event.deleted: {e}")
+            logger.error(f"Error handling EventDeleted: {e}")
 
 
 # Global subscriber instance
