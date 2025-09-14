@@ -312,3 +312,5 @@ class RateLimitDependency:
 login_rate_limit = RateLimitDependency(limit=5, window_seconds=900)
 register_rate_limit = RateLimitDependency(limit=3, window_seconds=900)
 password_reset_rate_limit = RateLimitDependency(limit=3, window_seconds=3600)
+otp_verification_rate_limit = RateLimitDependency(limit=5, window_seconds=300)  # 5 attempts per 5 minutes
+resend_otp_rate_limit = RateLimitDependency(limit=3, window_seconds=600)  # 3 attempts per 10 minutes

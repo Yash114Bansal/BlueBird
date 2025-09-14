@@ -58,6 +58,14 @@ async def lifespan(app: FastAPI):
             raise Exception("Redis ping failed")
         logger.info("Redis initialized and ping successful")
         
+        # Initialize OTP and Celery services
+        from .services.otp_service import otp_service
+        from .services.celery_service import celery_service
+        
+        await otp_service.initialize()
+        await celery_service.initialize()
+        logger.info("OTP and Celery services initialized")
+        
         logger.info("Auth Service started successfully")
         
     except Exception as e:

@@ -661,5 +661,264 @@ def health_check() -> Dict[str, Any]:
         }
 
 
+@celery_app.task(bind=True, name='email_workers.tasks.send_otp_verification_email')
+def send_otp_verification_email(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Send OTP verification email.
+    
+    Args:
+        task_data: Task data containing email, OTP, and user info
+        
+    Returns:
+        Task result dictionary
+    """
+    try:
+        email = task_data.get('email')
+        otp = task_data.get('otp')
+        user_data = task_data.get('user_data', {})
+        
+        if not email or not otp:
+            error_msg = "Email or OTP missing in task data"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'error': 'Missing required data',
+                'timestamp': datetime.now().isoformat()
+            }
+        
+        logger.info(f"Starting OTP verification email for {email}")
+        
+        # Generate email content
+        username = user_data.get('username', 'User')
+        full_name = user_data.get('full_name', username)
+        
+        subject = "Verify Your Email - Evently"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #2c3e50;">Verify Your Email Address</h2>
+                
+                <p>Hello {full_name},</p>
+                
+                <p>Welcome to Evently! Please verify your email address to complete your registration.</p>
+                
+                <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; margin: 30px 0; text-align: center; border: 2px solid #3498db;">
+                    <h3 style="color: #2c3e50; margin-top: 0;">Your Verification Code</h3>
+                    <div style="font-size: 36px; font-weight: bold; color: #3498db; letter-spacing: 8px; margin: 20px 0;">
+                        {otp}
+                    </div>
+                    <p style="color: #666; margin: 0;">This code will expire in 10 minutes</p>
+                </div>
+                
+                <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;">
+                    <p style="margin: 0; color: #856404;">
+                        <strong>Security Notice:</strong> Never share this code with anyone. Evently will never ask for your verification code.
+                    </p>
+                </div>
+                
+                <p>If you didn't create an account with Evently, you can safely ignore this email.</p>
+                
+                <p>Best regards,<br>The Evently Team</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        text_content = f"""
+        Verify Your Email Address
+        
+        Hello {full_name},
+        
+        Welcome to Evently! Please verify your email address to complete your registration.
+        
+        Your Verification Code: {otp}
+        
+        This code will expire in 10 minutes.
+        
+        Security Notice: Never share this code with anyone. Evently will never ask for your verification code.
+        
+        If you didn't create an account with Evently, you can safely ignore this email.
+        
+        Best regards,
+        The Evently Team
+        """
+        
+        # Send email using email service
+        success = email_service.send_email(
+            to_email=email,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content
+        )
+        
+        # Log email result
+        if success:
+            logger.info(f"OTP verification email sent successfully to {email}")
+        else:
+            logger.error(f"Failed to send OTP verification email to {email}")
+        
+        result = {
+            'success': success,
+            'email': email,
+            'otp_sent': success,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        logger.info(f"OTP verification email task completed for {email}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error sending OTP verification email: {e}")
+        
+        # Retry logic
+        max_retries = 3
+        retry_delay = 60
+        
+        if self.request.retries < max_retries:
+            logger.info(f"Retrying OTP verification email (attempt {self.request.retries + 1}/{max_retries})")
+            raise self.retry(countdown=retry_delay, exc=e)
+        
+        return {
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }
+
+
+@celery_app.task(bind=True, name='email_workers.tasks.send_welcome_email')
+def send_welcome_email(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Send welcome email after successful registration.
+    
+    Args:
+        task_data: Task data containing email and user info
+        
+    Returns:
+        Task result dictionary
+    """
+    try:
+        email = task_data.get('email')
+        user_data = task_data.get('user_data', {})
+        
+        if not email:
+            error_msg = "Email missing in task data"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'error': 'Missing required data',
+                'timestamp': datetime.now().isoformat()
+            }
+        
+        logger.info(f"Starting welcome email for {email}")
+        
+        # Generate email content
+        username = user_data.get('username', 'User')
+        full_name = user_data.get('full_name', username)
+        
+        subject = "Welcome to Evently!"
+        
+        html_content = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #27ae60;">Welcome to Evently!</h2>
+                
+                <p>Hello {full_name},</p>
+                
+                <p>Thank you for joining Evently! Your account has been successfully created and verified.</p>
+                
+                <div style="background-color: #e8f8f5; padding: 30px; border-radius: 10px; margin: 30px 0; border-left: 4px solid #27ae60;">
+                    <h3 style="color: #27ae60; margin-top: 0;">🎉 Account Verified!</h3>
+                    <p>Your email address has been verified and your account is now active.</p>
+                    <p><strong>Username:</strong> {username}</p>
+                    <p><strong>Email:</strong> {email}</p>
+                </div>
+                
+                <div style="background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                    <h3 style="color: #2c3e50; margin-top: 0;">What's Next?</h3>
+                    <ul style="color: #555;">
+                        <li>Browse and discover amazing events</li>
+                        <li>Book tickets for events you're interested in</li>
+                        <li>Create your own events (coming soon)</li>
+                        <li>Join our community and stay updated</li>
+                    </ul>
+                </div>
+                
+                <p>If you have any questions, feel free to reach out to our support team.</p>
+                
+                <p>Happy eventing!<br>The Evently Team</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        text_content = f"""
+        Welcome to Evently!
+        
+        Hello {full_name},
+        
+        Thank you for joining Evently! Your account has been successfully created and verified.
+        
+        Account Verified!
+        Your email address has been verified and your account is now active.
+        Username: {username}
+        Email: {email}
+        
+        What's Next?
+        - Browse and discover amazing events
+        - Book tickets for events you're interested in
+        - Create your own events (coming soon)
+        - Join our community and stay updated
+        
+        If you have any questions, feel free to reach out to our support team.
+        
+        Happy eventing!
+        The Evently Team
+        """
+        
+        # Send email using email service
+        success = email_service.send_email(
+            to_email=email,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content
+        )
+        
+        # Log email result
+        if success:
+            logger.info(f"Welcome email sent successfully to {email}")
+        else:
+            logger.error(f"Failed to send welcome email to {email}")
+        
+        result = {
+            'success': success,
+            'email': email,
+            'welcome_sent': success,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        logger.info(f"Welcome email task completed for {email}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error sending welcome email: {e}")
+        
+        # Retry logic
+        max_retries = 3
+        retry_delay = 60
+        
+        if self.request.retries < max_retries:
+            logger.info(f"Retrying welcome email (attempt {self.request.retries + 1}/{max_retries})")
+            raise self.retry(countdown=retry_delay, exc=e)
+        
+        return {
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }
+
+
 if __name__ == '__main__':
     celery_app.start()

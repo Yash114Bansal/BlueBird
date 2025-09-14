@@ -150,6 +150,8 @@ workers_config = WorkersConfig()
 # Task routing for different worker types
 CELERY_ROUTES = {
     'email_workers.tasks.*': {'queue': 'email_notifications'},
+    'email_workers.tasks.send_otp_verification_email': {'queue': 'email_notifications'},
+    'email_workers.tasks.send_welcome_email': {'queue': 'email_notifications'},
 }
 
 # Task serialization

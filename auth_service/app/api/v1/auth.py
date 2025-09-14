@@ -7,6 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
 
 from ..dependencies import (
     get_database_session,
@@ -21,6 +24,8 @@ from ..dependencies import (
     login_rate_limit,
     register_rate_limit,
     password_reset_rate_limit,
+    otp_verification_rate_limit,
+    resend_otp_rate_limit,
     security
 )
 from ...schemas.auth import (
@@ -35,7 +40,11 @@ from ...schemas.auth import (
     RefreshToken,
     SessionResponse,
     MessageResponse,
-    ErrorResponse
+    ErrorResponse,
+    OTPVerificationRequest,
+    OTPVerificationResponse,
+    ResendOTPRequest,
+    ResendOTPResponse
 )
 from ...models.user import User
 
@@ -52,7 +61,7 @@ async def register(
     rate_limit: bool = Depends(register_rate_limit)
 ):
     """
-    Register a new user.
+    Register a new user and send OTP verification email.
     
     Args:
         user_data: User registration data
@@ -75,6 +84,32 @@ async def register(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Registration failed. Email or username may already exist."
             )
+        
+        # Send OTP verification email
+        try:
+            from ...services.otp_service import otp_service
+            from ...services.celery_service import celery_service
+            
+            # Generate and store OTP
+            otp = otp_service.generate_otp()
+            await otp_service.store_otp(user.email, otp)
+            
+            # Send OTP email via Celery workers
+            await celery_service.send_otp_email(
+                user.email,
+                otp,
+                {
+                    'username': user.username,
+                    'full_name': user.full_name or user.username,
+                    'email': user.email
+                }
+            )
+            
+            logger.info(f"OTP verification email sent to {user.email}")
+            
+        except Exception as e:
+            logger.error(f"Failed to send OTP email to {user.email}: {e}")
+            # Don't fail registration if email sending fails
         
         return UserResponse.from_orm(user)
         
@@ -412,4 +447,214 @@ async def revoke_session(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during session revocation"
+        )
+
+
+@router.post("/verify-email", response_model=OTPVerificationResponse)
+async def verify_email(
+    verification_data: OTPVerificationRequest,
+    request: Request,
+    user_repo = Depends(get_user_repository),
+    auth_service = Depends(get_auth_service),
+    rate_limit: bool = Depends(otp_verification_rate_limit)
+):
+    """
+    Verify user email with OTP.
+    
+    Args:
+        verification_data: OTP verification data
+        user_repo: User repository
+        auth_service: Authentication service
+        
+    Returns:
+        Verification result
+        
+    Raises:
+        HTTPException: If verification fails
+    """
+    try:
+        # Import OTP service
+        from ...services.otp_service import otp_service
+        
+        # Find user by email
+        user = user_repo.get_by_email(verification_data.email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Check if user is already verified
+        if user.is_verified:
+            return OTPVerificationResponse(
+                success=True,
+                message="Email already verified",
+                verified=True
+            )
+        
+        # Validate OTP
+        validation_result = await otp_service.validate_otp(
+            verification_data.email, 
+            verification_data.otp
+        )
+        
+        if not validation_result["valid"]:
+            # Get remaining attempts
+            otp_info = await otp_service.get_otp_info(verification_data.email)
+            remaining_attempts = otp_info.get("remaining_attempts", 0)
+            
+            if validation_result["reason"] == "MAX_ATTEMPTS_EXCEEDED":
+                return OTPVerificationResponse(
+                    success=False,
+                    message=validation_result["message"],
+                    verified=False,
+                    remaining_attempts=0
+                )
+            elif validation_result["reason"] == "OTP_NOT_FOUND":
+                return OTPVerificationResponse(
+                    success=False,
+                    message="OTP expired or not found. Please request a new one.",
+                    verified=False,
+                    remaining_attempts=0
+                )
+            else:
+                return OTPVerificationResponse(
+                    success=False,
+                    message=validation_result["message"],
+                    verified=False,
+                    remaining_attempts=remaining_attempts
+                )
+        
+        # Mark user as verified
+        user.is_verified = True
+        user_repo.session.commit()
+        
+        # Send welcome email
+        from ...services.celery_service import celery_service
+        await celery_service.send_welcome_email(
+            user.email,
+            {
+                'username': user.username,
+                'full_name': user.full_name or user.username,
+                'email': user.email
+            }
+        )
+        
+        logger.info(f"Email verified successfully for user {user.email}")
+        
+        return OTPVerificationResponse(
+            success=True,
+            message="Email verified successfully",
+            verified=True
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Email verification failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during email verification"
+        )
+
+
+@router.post("/resend-otp", response_model=ResendOTPResponse)
+async def resend_otp(
+    resend_data: ResendOTPRequest,
+    request: Request,
+    user_repo = Depends(get_user_repository),
+    auth_service = Depends(get_auth_service),
+    rate_limit: bool = Depends(resend_otp_rate_limit)
+):
+    """
+    Resend OTP verification email.
+    
+    Args:
+        resend_data: Resend OTP data
+        user_repo: User repository
+        auth_service: Authentication service
+        
+    Returns:
+        Resend result
+        
+    Raises:
+        HTTPException: If resend fails
+    """
+    try:
+        # Import services
+        from ...services.otp_service import otp_service
+        from ...services.celery_service import celery_service
+        
+        # Find user by email
+        user = user_repo.get_by_email(resend_data.email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Check if user is already verified
+        if user.is_verified:
+            return ResendOTPResponse(
+                success=True,
+                message="Email already verified",
+                otp_sent=False
+            )
+        
+        # Check if there's already an active OTP
+        otp_info = await otp_service.get_otp_info(resend_data.email)
+        if not otp_info["is_expired"]:
+            return ResendOTPResponse(
+                success=True,
+                message="OTP already sent. Please check your email or wait for it to expire.",
+                otp_sent=False,
+                remaining_attempts=otp_info["remaining_attempts"]
+            )
+        
+        # Generate new OTP
+        otp = otp_service.generate_otp()
+        
+        # Store OTP in cache
+        stored = await otp_service.store_otp(resend_data.email, otp)
+        if not stored:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to generate OTP"
+            )
+        
+        # Send OTP email via Celery workers
+        email_sent = await celery_service.send_otp_email(
+            resend_data.email,
+            otp,
+            {
+                'username': user.username,
+                'full_name': user.full_name or user.username,
+                'email': user.email
+            }
+        )
+        
+        if not email_sent:
+            # Clean up stored OTP if email sending failed
+            await otp_service.clear_otp(resend_data.email)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to send verification email"
+            )
+        
+        logger.info(f"OTP resent successfully to {resend_data.email}")
+        
+        return ResendOTPResponse(
+            success=True,
+            message="Verification email sent successfully",
+            otp_sent=True,
+            remaining_attempts=otp_info["max_attempts"]
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Resend OTP failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during OTP resend"
         )

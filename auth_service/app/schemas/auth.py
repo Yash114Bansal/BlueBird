@@ -166,3 +166,37 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
     success: bool = False
+
+
+class OTPVerificationRequest(BaseModel):
+    """Schema for OTP verification request."""
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6)
+    
+    @validator('otp')
+    def validate_otp(cls, v):
+        """Validate OTP format."""
+        if not v.isdigit():
+            raise ValueError('OTP must contain only digits')
+        return v
+
+
+class OTPVerificationResponse(BaseModel):
+    """Schema for OTP verification response."""
+    success: bool
+    message: str
+    verified: bool = False
+    remaining_attempts: Optional[int] = None
+
+
+class ResendOTPRequest(BaseModel):
+    """Schema for resend OTP request."""
+    email: EmailStr
+
+
+class ResendOTPResponse(BaseModel):
+    """Schema for resend OTP response."""
+    success: bool
+    message: str
+    otp_sent: bool = False
+    remaining_attempts: Optional[int] = None
