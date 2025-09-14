@@ -39,6 +39,7 @@ class EventPublisher:
                     "category": getattr(event, 'category', None),
                     "capacity": event.capacity,
                     "price": float(event.price) if event.price else 0.0,
+                    "status": event.status,  # Include event status
                     "event_date": event.event_date.isoformat() if event.event_date else None,
                     "created_at": event.created_at.isoformat() if event.created_at else None
                 }
@@ -69,6 +70,7 @@ class EventPublisher:
                     "category": getattr(event, 'category', None),
                     "capacity": event.capacity,
                     "price": float(event.price) if event.price else 0.0,
+                    "status": event.status,  # Include event status
                     "event_date": event.event_date.isoformat() if event.event_date else None,
                     "updated_at": event.updated_at.isoformat() if event.updated_at else None
                 }

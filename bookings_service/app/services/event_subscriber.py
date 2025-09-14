@@ -125,12 +125,18 @@ class EventSubscriber:
             event_name = event_data.get('name')  # Get event name from published data
             capacity = event_data.get('capacity', 0)
             price = event_data.get('price', 0.00)
+            status = event_data.get('status')  # Get event status
             
             if not event_id:
                 logger.error("Event ID missing in EventCreated data")
                 return
             
-            # Create EventAvailability record
+            # Only create EventAvailability for published events
+            if status != 'published':
+                logger.info(f"Skipping EventAvailability creation for event {event_id} with status '{status}' - only published events are bookable")
+                return
+            
+            # Create EventAvailability record for published events only
             with db_manager.get_session() as session:
                 # Check if availability already exists
                 existing = session.query(EventAvailability).filter(
@@ -161,7 +167,7 @@ class EventSubscriber:
                 session.add(availability)
                 session.commit()
                 
-                logger.info(f"Created EventAvailability for event {event_id} with capacity {capacity} and price {price}")
+                logger.info(f"Created EventAvailability for published event {event_id} with capacity {capacity} and price {price}")
                 
         except Exception as e:
             logger.error(f"Error handling EventCreated: {e}")
@@ -174,19 +180,31 @@ class EventSubscriber:
             event_name = event_data.get('name')  # Get event name from updated data
             new_capacity = event_data.get('capacity')
             new_price = event_data.get('price')
+            new_status = event_data.get('status')  # Get event status
             
             if not event_id or new_capacity is None:
                 logger.error("Event ID or capacity missing in EventUpdated data")
                 return
             
-            # Update EventAvailability record
+            # Handle status changes
             with db_manager.get_session() as session:
                 availability = session.query(EventAvailability).filter(
                     EventAvailability.event_id == event_id
                 ).first()
                 
+                # If event is not published, remove EventAvailability if it exists
+                if new_status != 'published':
+                    if availability:
+                        session.delete(availability)
+                        session.commit()
+                        logger.info(f"Removed EventAvailability for event {event_id} - event status changed to '{new_status}' (not published)")
+                    else:
+                        logger.info(f"Event {event_id} status is '{new_status}' - no EventAvailability to remove")
+                    return
+                
+                # Event is published - create or update EventAvailability
                 if not availability:
-                    logger.warning(f"EventAvailability not found for event {event_id}, creating new one")
+                    logger.info(f"Creating EventAvailability for event {event_id} - event status changed to 'published'")
                     # Create new availability record
                     availability = EventAvailability(
                         event_id=event_id,
@@ -220,7 +238,7 @@ class EventSubscriber:
                     availability.last_updated = datetime.now(timezone.utc)
                 
                 session.commit()
-                logger.info(f"Updated EventAvailability for event {event_id} to capacity {new_capacity} and price {new_price}")
+                logger.info(f"Updated EventAvailability for published event {event_id} to capacity {new_capacity} and price {new_price}")
                 
         except Exception as e:
             logger.error(f"Error handling EventUpdated: {e}")
