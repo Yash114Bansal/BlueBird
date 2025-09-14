@@ -11,7 +11,7 @@ pydantic-settings
 email-validator
 psycopg2-binary
 zero-python-sdk
-
+celery[redis]
 # Testing dependencies
 pytest
 pytest-asyncio
