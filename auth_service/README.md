@@ -1,21 +1,34 @@
-# Evently Auth Service for BlueBird
+# Evently Auth Service
 
+A comprehensive authentication and authorization microservice built with FastAPI, designed for high-performance app.
 
 ## 🚀 Key Features
 
-### Core Functionality
-- **User Authentication**: Complete registration, login, and session management
-- **JWT Token Management**: Secure token generation, validation, and refresh
-- **Role-Based Access Control**: User and Admin role management with granular permissions
-- **Session Management**: Redis-powered session tracking and security
-- **High Availability**: Designed for 99.9% uptime with graceful degradation
+### Core Authentication
+- **User Registration & Login**: Complete user lifecycle management with email verification
+- **JWT Token Management**: Secure access tokens (30 min) and refresh tokens (7 days)
+- **OTP Email Verification**: 6-digit OTP system with Redis caching and rate limiting
+- **Password Security**: Bcrypt hashing with configurable salt rounds
+- **Session Management**: Redis-powered session tracking with IP and user agent validation
 
-### Security & Performance
-- **Password Security**: Bcrypt hashing with salt rounds
-- **Rate Limiting**: Configurable rate limits for authentication endpoints
-- **Session Security**: IP tracking, user agent validation, and session invalidation
-- **Error Handling**: Comprehensive error handling with detailed logging
-- **Health Monitoring**: Built-in health checks and service monitoring
+### Authorization & Security
+- **Role-Based Access Control**: User and Admin roles with granular permissions
+- **Rate Limiting**: Per-endpoint rate limiting with Redis backend using Sliding Window
+- **Session Security**: Multi-device session management with revocation capabilities
+- **Input Validation**: Comprehensive Pydantic schema validation
+- **CORS Protection**: Configurable origin restrictions
+
+### Email & Notifications
+- **Asynchronous Email**: Celery-powered email workers for OTP and welcome emails
+- **Email Templates**: Professional email templates for verification and notifications
+- **Retry Logic**: Robust email delivery with retry mechanisms
+- **Queue Management**: Dedicated email notification queues
+
+### Performance & Reliability
+- **High Availability**: Stateless design supporting horizontal scaling
+- **Health Monitoring**: Comprehensive health checks for database and Redis
+- **Error Handling**: Detailed error responses with proper HTTP status codes
+- **Structured Logging**: JSON-formatted logs for easy parsing and monitoring
 
 ## 🏗️ Architecture Overview
 
@@ -34,43 +47,48 @@ auth_service/
 ```
 
 ### Technology Stack
-- **Framework**: FastAPI (async, high-performance)
-- **Database**: PostgreSQL with SQLAlchemy ORM
-- **Caching**: Redis for session and token caching
+- **Framework**: FastAPI (async, high-performance web framework)
+- **Database**: PostgreSQL with SQLAlchemy ORM and Alembic migrations
+- **Caching**: Redis for session management, OTP storage, and rate limiting
 - **Authentication**: JWT with bcrypt password hashing
-- **Secrets Management**: Zero SDK for secure configuration
-- **Containerization**: Docker with optimized builds
+- **Email**: Celery workers with Redis broker for asynchronous email delivery
+- **Secrets Management**: Zero SDK for secure configuration management
+- **Containerization**: Docker with Python 3.11 slim base image
+- **Testing**: Pytest with comprehensive test coverage
 
 ## 📡 API Endpoints
 
 ### Authentication Endpoints (Public)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/auth/register` | User registration |
-| `POST` | `/api/v1/auth/login` | User login |
-| `POST` | `/api/v1/auth/refresh` | Refresh JWT token |
-| `POST` | `/api/v1/auth/logout` | User logout |
-| `POST` | `/api/v1/auth/change-password` | Change user password |
-| `POST` | `/api/v1/auth/forgot-password` | Request password reset |
-| `POST` | `/api/v1/auth/reset-password` | Reset password with token |
+| `POST` | `/api/v1/auth/register` | User registration with OTP email |
+| `POST` | `/api/v1/auth/login` | User authentication |
+| `POST` | `/api/v1/auth/refresh` | Refresh JWT access token |
+| `POST` | `/api/v1/auth/logout` | User logout (invalidate session) |
+| `POST` | `/api/v1/auth/verify-email` | Verify email with OTP |
+| `POST` | `/api/v1/auth/resend-otp` | Resend OTP verification email |
 
 ### User Profile Endpoints (JWT Required)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/api/v1/auth/me` | Get current user profile |
 | `PUT` | `/api/v1/auth/me` | Update user profile |
+| `POST` | `/api/v1/auth/change-password` | Change user password |
 | `GET` | `/api/v1/auth/sessions` | Get user active sessions |
 | `DELETE` | `/api/v1/auth/sessions/{session_id}` | Terminate specific session |
 
 ### Admin Endpoints (Admin JWT Required)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/v1/admin/users` | List all users |
+| `GET` | `/api/v1/admin/users` | List all users with pagination |
 | `GET` | `/api/v1/admin/users/{user_id}` | Get user by ID |
-| `PUT` | `/api/v1/admin/users/{user_id}` | Update user |
-| `DELETE` | `/api/v1/admin/users/{user_id}` | Delete user |
-| `PUT` | `/api/v1/admin/users/{user_id}/verify` | Verify user account |
-| `PUT` | `/api/v1/admin/users/{user_id}/activate` | Activate/deactivate user |
+| `PUT` | `/api/v1/admin/users/{user_id}` | Update user profile |
+| `DELETE` | `/api/v1/admin/users/{user_id}` | Delete user account |
+| `POST` | `/api/v1/admin/users/{user_id}/activate` | Activate user account |
+| `POST` | `/api/v1/admin/users/{user_id}/deactivate` | Deactivate user account |
+| `GET` | `/api/v1/admin/users/{user_id}/sessions` | Get user sessions |
+| `DELETE` | `/api/v1/admin/users/{user_id}/sessions` | Revoke all user sessions |
+| `POST` | `/api/v1/admin/cleanup-sessions` | Cleanup expired sessions |
 
 ### System Endpoints
 | Method | Endpoint | Description |
@@ -89,14 +107,13 @@ export ZERO_TOKEN="your-zero-token-here"
 ```
 
 ### Required Secrets (via Zero SDK)
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Database configuration
-- `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_USE_TLS` - Redis configuration
-- `JWT_SECRET`, `JWT_ALGORITHM`, `JWT_EXPIRY_MINUTES` - JWT configuration
-- `REFRESH_TOKEN_EXPIRY_DAYS` - Refresh token expiry
-- `PASSWORD_RESET_EXPIRY_HOURS` - Password reset token expiry
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` - Email configuration
-- `CORS_ORIGINS` - CORS allowed origins
-- `RATE_LIMIT_LOGIN`, `RATE_LIMIT_REGISTER`, `RATE_LIMIT_WINDOW` - Rate limiting
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - PostgreSQL database configuration
+- `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_USE_TLS` - Redis configuration for sessions and OTP
+- `JWT_SECRET`, `JWT_ALGORITHM`, `JWT_EXPIRY_MINUTES` - JWT token configuration
+- `REFRESH_TOKEN_EXPIRY_DAYS` - Refresh token expiry (default: 7 days)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_USE_TLS` - Email configuration
+- `CORS_ORIGINS` - CORS allowed origins (comma-separated)
+- `RATE_LIMIT_LOGIN`, `RATE_LIMIT_REGISTER`, `RATE_LIMIT_WINDOW` - Rate limiting configuration
 
 ### Quick Start
 
@@ -109,6 +126,9 @@ pip install -r requirements.txt
 
 # Set environment variable
 export ZERO_TOKEN="your-token"
+
+# Run database migrations
+python migrate.py upgrade
 
 # Run the service
 python main.py
@@ -130,110 +150,118 @@ docker run -p 8000:8000 \
 # Using Docker Compose (recommended)
 docker-compose up -d
 
-# Or with Kubernetes
-kubectl apply -f k8s/
 ```
 
 ## 🧪 Testing
 
 ### Running Tests
 ```bash
-# Run all tests
 pytest tests/ -v
 
-# Run with coverage
-pytest tests/ --cov=app --cov-report=html
-
-# Run specific test categories
-pytest tests/api/ -v          # API tests
-pytest tests/models/ -v       # Model tests
-pytest tests/services/ -v     # Service tests
 ```
 
 ## 🔒 Security & Authentication
 
 ### JWT Implementation
-- **Algorithm**: HS256 (configurable)
-- **Expiry**: 30 minutes (configurable)
-- **Refresh Tokens**: 7-day expiry with automatic renewal
-- **Role-based Access**: User and Admin roles
-- **Token Validation**: Comprehensive token verification
+- **Algorithm**: HS256 (configurable via Zero SDK)
+- **Access Token Expiry**: 30 minutes (configurable)
+- **Refresh Token Expiry**: 7 days (configurable)
+- **Token Rotation**: Automatic refresh token rotation on use
+- **Role-based Access**: User and Admin roles with granular permissions
+- **Token Validation**: Comprehensive token verification with user status checks
 
 ### Security Features
-- **Password Hashing**: Bcrypt with configurable salt rounds
-- **Rate Limiting**: Per-endpoint rate limiting with Redis
-- **Session Management**: IP tracking and user agent validation
+- **Password Security**: Bcrypt hashing with configurable salt rounds
+- **Rate Limiting**: Per-endpoint rate limiting with Redis backend
+- **Session Security**: IP tracking, user agent validation, and multi-device support
+- **OTP Security**: 6-digit OTP with 3 attempts and 10-minute expiry
 - **CORS Protection**: Configurable origin restrictions
-- **Input Validation**: Pydantic schema validation
-- **SQL Injection Protection**: SQLAlchemy ORM protection
+- **Input Validation**: Comprehensive Pydantic schema validation
+- **SQL Injection Protection**: SQLAlchemy ORM with parameterized queries
+- **Email Verification**: Mandatory email verification before login
 
 ## 📊 Performance & Monitoring
 
 ### Session Management
-- **Redis Caching**: Session data cached for fast access
+- **Redis Caching**: Session data cached for fast access and scalability
 - **Session Invalidation**: Automatic cleanup of expired sessions
 - **Concurrent Sessions**: Support for multiple active sessions per user
-- **Session Security**: IP and user agent tracking
+- **Session Security**: IP and user agent tracking with session revocation
+- **Session Cleanup**: Admin endpoint for manual session cleanup
 
 ### Monitoring & Observability
-- **Health Checks**: `/health` endpoint for load balancer integration
-- **Structured Logging**: JSON-formatted logs for easy parsing
-- **Error Tracking**: Comprehensive error logging and reporting
-- **Performance Metrics**: Request timing and database query metrics
+- **Health Checks**: `/health` endpoint with database and Redis connectivity checks
+- **Structured Logging**: JSON-formatted logs with request correlation IDs
+- **Error Tracking**: Comprehensive error logging with stack traces
+- **Performance Metrics**: Request timing, database query metrics, and Redis operations
+- **Service Information**: `/info` endpoint with service capabilities and features
 
 ## 🔄 Data Consistency & Reliability
 
 ### Database Design
-- **ACID Compliance**: Full transaction support
-- **Data Integrity**: Foreign key constraints and validation
+- **ACID Compliance**: Full transaction support with SQLAlchemy ORM
+- **Data Integrity**: Foreign key constraints, unique constraints, and validation
+- **Migration Management**: Alembic for database schema versioning
+- **Connection Pooling**: Optimized database connection management
 
+### Data Models
 
-### User Model
+#### User Model
 ```python
 class User:
     id: int                    # Primary key
-    email: str                 # Unique email address
-    username: str              # Unique username
+    email: str                 # Unique email address (indexed)
+    username: str              # Unique username (indexed)
     hashed_password: str       # Bcrypt hashed password
-    full_name: str             # User's full name
-    is_active: bool            # Account status
-    is_verified: bool          # Email verification status
-    role: UserRole             # user/admin role
-    created_at: datetime       # Creation timestamp
-    updated_at: datetime       # Last update timestamp
-    last_login: datetime       # Last login timestamp
+    full_name: str             # User's full name (optional)
+    is_active: bool            # Account status (default: True)
+    is_verified: bool          # Email verification status (default: False)
+    role: UserRole             # user/admin role (default: user)
+    created_at: datetime       # Creation timestamp (auto-generated)
+    updated_at: datetime       # Last update timestamp (auto-updated)
+    last_login: datetime       # Last login timestamp (nullable)
 ```
 
-### Session Model
+#### Session Model
 ```python
 class UserSession:
     id: int                    # Primary key
-    user_id: int               # Foreign key to user
-    session_token: str         # Unique session token
-    refresh_token: str         # Refresh token
-    is_active: bool            # Session status
-    expires_at: datetime       # Session expiry
-    created_at: datetime       # Creation timestamp
-    last_accessed: datetime    # Last access timestamp
-    ip_address: str            # Client IP address
-    user_agent: str            # Client user agent
+    user_id: int               # Foreign key to user (indexed)
+    session_token: str         # Unique session token (indexed)
+    refresh_token: str         # Refresh token (indexed, nullable)
+    is_active: bool            # Session status (default: True)
+    expires_at: datetime       # Session expiry timestamp
+    created_at: datetime       # Creation timestamp (auto-generated)
+    last_accessed: datetime    # Last access timestamp (auto-updated)
+    ip_address: str            # Client IP address (nullable)
+    user_agent: str            # Client user agent (nullable)
 ```
 
 ### Consistency Guarantees
-- **Session Consistency**: Redis and database synchronization
-- **Token Validation**: Real-time token verification
-- **Password Security**: Secure password storage and verification
+- **Session Consistency**: Redis and database synchronization with automatic cleanup
+- **Token Validation**: Real-time token verification with user status checks
+- **Password Security**: Secure password storage with bcrypt hashing
+- **OTP Management**: Redis-based OTP storage with automatic expiry
+- **Email Verification**: Mandatory verification before account activation
 
 ## 🚀 Deployment & Scaling
 
 ### Container Configuration
-- **Base Image**: Python 3.11 slim for optimal size
-- **Optimized Build**: Minimal dependencies for security
-- **Health Checks**: Container health monitoring
-- **Resource Limits**: CPU and memory constraints
+- **Base Image**: Python 3.11 slim for optimal size and security
+- **Optimized Build**: Minimal dependencies with security-focused packages
+- **Health Checks**: Built-in health monitoring with dependency checks
+- **Resource Limits**: Configurable CPU and memory constraints
 
 ### Scaling Considerations
 - **Horizontal Scaling**: Stateless design supports multiple instances
-- **Database Scaling**: Read replicas for query distribution
-- **Cache Scaling**: Redis cluster for high availability
+- **Database Scaling**: Connection pooling with read replicas support
+- **Cache Scaling**: Redis cluster for high availability and performance
 - **Load Balancing**: Round-robin or least-connections strategies
+- **Email Workers**: Separate Celery workers for email processing
+- **Session Distribution**: Redis-based session sharing across instances
+
+### Production Deployment
+- **Docker Compose**: Multi-service orchestration with PostgreSQL and Redis
+- **Environment Management**: Zero SDK for secure configuration
+- **Monitoring**: Health checks and structured logging for observability
+- **Backup Strategy**: Database backups and Redis persistence
