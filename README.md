@@ -197,6 +197,8 @@ Each service maintains its own PostgreSQL database with domain-specific models:
 - **Version-based Locking**: Prevents booking conflicts without blocking
 - **Retry Mechanisms**: Automatic retry with exponential backoff
 - **Audit Trail**: Complete history of all booking changes
+<img width="4741" height="2240" alt="image" src="https://github.com/user-attachments/assets/ecc13435-ead7-4d9f-b6c7-38ffccd3177d" />
+
 
 ### 4. Zero-Configuration Secrets
 - **Zero SDK Integration**: Secure secrets management without hardcoded values
