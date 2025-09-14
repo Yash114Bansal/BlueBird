@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from typing import Generator, Optional
 
 from ..db.database import DatabaseConnection, UserRepository, UserSessionRepository
+from ..db.redis_client import RedisConnection
 from ..services.auth_service import AuthenticationService
 from ..models.user import User
 from ..schemas.auth import TokenData
@@ -18,6 +19,7 @@ security = HTTPBearer()
 
 # Global instances
 db_connection = DatabaseConnection()
+redis_connection = RedisConnection()
 auth_service = AuthenticationService()
 
 
@@ -254,9 +256,56 @@ class RateLimitDependency:
         Raises:
             HTTPException: If rate limit exceeded
         """
-        # TODO: Implement rate limiting
-        
-        return True
+        try:
+            # Get client IP for rate limiting
+            client_ip = get_client_ip(request)
+            
+            # Create rate limit key based on endpoint and IP
+            endpoint = request.url.path.split('/')[-1] if request.url.path else 'unknown'
+            rate_limit_key = f"rate_limit:{endpoint}:{client_ip}"
+            
+            # Get rate limiter instance
+            rate_limiter = redis_connection.get_rate_limiter()
+            
+            # Check if request is allowed
+            is_allowed = await rate_limiter.is_allowed(
+                key=rate_limit_key,
+                limit=self.limit,
+                window_seconds=self.window_seconds
+            )
+            
+            if not is_allowed:
+                # Get remaining attempts for error message
+                remaining = await rate_limiter.get_remaining_attempts(
+                    key=rate_limit_key,
+                    limit=self.limit
+                )
+                
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail={
+                        "error": "Rate limit exceeded",
+                        "message": f"Too many requests. Try again later.",
+                        "limit": self.limit,
+                        "window_seconds": self.window_seconds,
+                        "remaining_attempts": remaining,
+                        "retry_after": self.window_seconds
+                    },
+                    headers={
+                        "Retry-After": str(self.window_seconds),
+                        "X-RateLimit-Limit": str(self.limit),
+                        "X-RateLimit-Remaining": str(remaining),
+                        "X-RateLimit-Reset": str(self.window_seconds)
+                    }
+                )
+            
+            return True
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"Rate limiting error: {e}")
+            return True
 
 
 # Rate limiting dependencies

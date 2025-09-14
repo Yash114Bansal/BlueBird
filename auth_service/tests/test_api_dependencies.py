@@ -371,24 +371,70 @@ class TestRateLimitDependency:
     """Test rate limiting dependency."""
 
     @pytest.mark.asyncio
-    async def test_rate_limit_allowed(self):
+    @patch('app.api.dependencies.redis_connection')
+    async def test_rate_limit_allowed(self, mock_redis_connection):
         """Test rate limit allowing request."""
-        rate_limit = RateLimitDependency(limit=5, window_seconds=900)
-        mock_request = Mock(spec=Request)
+        # Mock the rate limiter
+        mock_rate_limiter = AsyncMock()
+        mock_rate_limiter.is_allowed.return_value = True
+        mock_redis_connection.get_rate_limiter.return_value = mock_rate_limiter
         
+        # Mock request
+        mock_request = Mock(spec=Request)
+        mock_request.url.path = "/api/v1/auth/login"
+        mock_request.client.host = "127.0.0.1"
+        mock_request.headers = {}
+        
+        rate_limit = RateLimitDependency(limit=5, window_seconds=900)
         result = await rate_limit(mock_request)
+        
         assert result is True
+        mock_rate_limiter.is_allowed.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_rate_limit_exceeded(self):
-        """Test rate limit exceeding (placeholder implementation)."""
-        # Note: Current implementation always returns True
-        # This test documents the expected behavior when rate limiting is implemented
-        rate_limit = RateLimitDependency(limit=1, window_seconds=60)
-        mock_request = Mock(spec=Request)
+    @patch('app.api.dependencies.redis_connection')
+    async def test_rate_limit_exceeded(self, mock_redis_connection):
+        """Test rate limit exceeding."""
+        # Mock the rate limiter to return False (rate limit exceeded)
+        mock_rate_limiter = AsyncMock()
+        mock_rate_limiter.is_allowed.return_value = False
+        mock_rate_limiter.get_remaining_attempts.return_value = 0
+        mock_redis_connection.get_rate_limiter.return_value = mock_rate_limiter
         
+        # Mock request
+        mock_request = Mock(spec=Request)
+        mock_request.url.path = "/api/v1/auth/login"
+        mock_request.client.host = "127.0.0.1"
+        mock_request.headers = {}
+        
+        rate_limit = RateLimitDependency(limit=1, window_seconds=60)
+        
+        with pytest.raises(HTTPException) as exc_info:
+            await rate_limit(mock_request)
+        
+        assert exc_info.value.status_code == 429
+        assert "Rate limit exceeded" in str(exc_info.value.detail)
+        mock_rate_limiter.is_allowed.assert_called_once()
+        mock_rate_limiter.get_remaining_attempts.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch('app.api.dependencies.redis_connection')
+    async def test_rate_limit_redis_error_fallback(self, mock_redis_connection):
+        """Test that rate limiting gracefully handles Redis errors."""
+        # Mock Redis connection to raise an exception
+        mock_redis_connection.get_rate_limiter.side_effect = Exception("Redis connection failed")
+        
+        # Mock request
+        mock_request = Mock(spec=Request)
+        mock_request.url.path = "/api/v1/auth/login"
+        mock_request.client.host = "127.0.0.1"
+        mock_request.headers = {}
+        
+        rate_limit = RateLimitDependency(limit=5, window_seconds=900)
+        
+        # Should not raise exception, should allow request to proceed
         result = await rate_limit(mock_request)
-        assert result is True  # Current implementation always allows
+        assert result is True
 
 
 class TestSecurityScheme:
