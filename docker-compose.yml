@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  auth-service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    ports:
+      - "35000:8000"
+    environment:
+      - ZERO_TOKEN=${ZERO_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  events-service:
+    build:
+      context: ./events_service
+      dockerfile: Dockerfile
+    ports:
+      - "35001:8001"
+    environment:
+      - ZERO_TOKEN=${ZERO_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  bookings-service:
+    build:
+      context: ./bookings_service
+      dockerfile: Dockerfile
+    ports:
+      - "35002:8002"
+    environment:
+      - ZERO_TOKEN=${ZERO_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  analytics-service:
+    build:
+      context: ./analytics_service
+      dockerfile: Dockerfile
+    ports:
+      - "35003:8003"
+    environment:
+      - ZERO_TOKEN=${ZERO_TOKEN}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  email-workers:
+    build:
+      context: ./workers
+      dockerfile: Dockerfile
+    environment:
+      - ZERO_TOKEN=${ZERO_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - events-service
+      - bookings-service
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+
+networks:
+  default:
+    name: evently-network
