@@ -1,0 +1,18 @@
+# Core dependencies
+celery[redis]
+redis==5.0.1
+zero-python-sdk
+
+# Database dependencies
+psycopg2-binary
+
+# Async support
+asyncio-mqtt
+
+# Logging and monitoring
+structlog
+
+# Development dependencies
+pytest
+pytest-asyncio
+pytest-mock
