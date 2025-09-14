@@ -29,19 +29,31 @@ class TestEventPublisher:
         """Create publisher instance for testing."""
         return EventPublisher(mock_cache_manager)
     
+    def _create_mock_event(self, **kwargs):
+        """Helper to create mock event objects with real values."""
+        class MockEvent:
+            def __init__(self, **attrs):
+                # Default values
+                self.id = 1
+                self.title = "Test Event"
+                self.capacity = 100
+                self.price = Decimal("25.50")
+                self.event_date = datetime(2024, 6, 15, 18, 0, 0, tzinfo=timezone.utc)
+                self.created_at = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+                self.updated_at = datetime(2024, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
+                self.category = "Technology"
+                self.status = "published"
+                
+                # Override with provided values
+                for key, value in attrs.items():
+                    setattr(self, key, value)
+        
+        return MockEvent(**kwargs)
+
     @pytest.fixture
     def mock_event(self):
         """Mock event object for testing."""
-        event = MagicMock()
-        event.id = 1
-        event.title = "Test Event"
-        event.capacity = 100
-        event.price = Decimal("25.50")
-        event.event_date = datetime(2024, 6, 15, 18, 0, 0, tzinfo=timezone.utc)
-        event.created_at = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-        event.updated_at = datetime(2024, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
-        event.category = "Technology"
-        return event
+        return self._create_mock_event()
     
     def test_publisher_initialization(self, publisher):
         """Test that EventPublisher initializes correctly."""
@@ -153,14 +165,12 @@ class TestEventPublisher:
     async def test_publish_event_created_with_none_values(self, publisher, mock_cache_manager):
         """Test publishing event created with None values."""
         # Create event with None values
-        event = MagicMock()
-        event.id = 1
-        event.title = "Test Event"
-        event.capacity = 100
-        event.price = None
-        event.event_date = None
-        event.created_at = None
-        event.category = None
+        event = self._create_mock_event(
+            price=None,
+            event_date=None,
+            created_at=None,
+            category=None
+        )
         
         # Call the method
         await publisher.publish_event_created(event)
@@ -184,14 +194,12 @@ class TestEventPublisher:
     async def test_publish_event_updated_with_none_values(self, publisher, mock_cache_manager):
         """Test publishing event updated with None values."""
         # Create event with None values
-        event = MagicMock()
-        event.id = 1
-        event.title = "Test Event"
-        event.capacity = 100
-        event.price = None
-        event.event_date = None
-        event.updated_at = None
-        event.category = None
+        event = self._create_mock_event(
+            price=None,
+            event_date=None,
+            updated_at=None,
+            category=None
+        )
         
         # Call the method
         await publisher.publish_event_updated(event)
@@ -251,13 +259,7 @@ class TestEventPublisher:
     async def test_publish_event_created_without_category(self, publisher, mock_cache_manager):
         """Test publishing event created without category attribute."""
         # Create event without category attribute
-        event = MagicMock()
-        event.id = 1
-        event.title = "Test Event"
-        event.capacity = 100
-        event.price = Decimal("25.50")
-        event.event_date = datetime(2024, 6, 15, 18, 0, 0, tzinfo=timezone.utc)
-        event.created_at = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        event = self._create_mock_event()
         
         # Remove category attribute
         if hasattr(event, 'category'):
@@ -282,13 +284,7 @@ class TestEventPublisher:
     async def test_publish_event_updated_without_category(self, publisher, mock_cache_manager):
         """Test publishing event updated without category attribute."""
         # Create event without category attribute
-        event = MagicMock()
-        event.id = 1
-        event.title = "Test Event"
-        event.capacity = 100
-        event.price = Decimal("25.50")
-        event.event_date = datetime(2024, 6, 15, 18, 0, 0, tzinfo=timezone.utc)
-        event.updated_at = datetime(2024, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
+        event = self._create_mock_event()
         
         # Remove category attribute
         if hasattr(event, 'category'):
@@ -314,16 +310,7 @@ class TestEventPublisher:
         """Test that all publish methods produce valid JSON."""
         # Create a properly configured mock event for each method
         def create_mock_event():
-            event = MagicMock()
-            event.id = 1
-            event.title = "Test Event"
-            event.capacity = 100
-            event.price = Decimal("25.50")
-            event.event_date = datetime(2024, 6, 15, 18, 0, 0, tzinfo=timezone.utc)
-            event.created_at = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
-            event.updated_at = datetime(2024, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
-            event.category = "Technology"
-            return event
+            return self._create_mock_event()
         
         # Test event created and updated methods
         for method in [publisher.publish_event_created, publisher.publish_event_updated]:

@@ -239,7 +239,8 @@ class TestEventSubscriberComprehensive:
         data = {
             "event_data": {
                 "id": 100,
-                "capacity": 50
+                "capacity": 50,
+                "status": "published"
             }
         }
         
@@ -307,7 +308,8 @@ class TestEventSubscriberComprehensive:
         data = {
             "event_data": {
                 "id": 100,
-                "capacity": 75
+                "capacity": 75,
+                "status": "published"
             }
         }
         
@@ -336,7 +338,8 @@ class TestEventSubscriberComprehensive:
         data = {
             "event_data": {
                 "id": 100,
-                "capacity": 75
+                "capacity": 75,
+                "status": "published"
             }
         }
         
@@ -438,7 +441,8 @@ class TestEventSubscriberComprehensive:
         data = {
             "event_data": {
                 "id": 100,
-                "capacity": 50  # Reduce from 100 to 50
+                "capacity": 50,  # Reduce from 100 to 50
+                "status": "published"
             }
         }
         

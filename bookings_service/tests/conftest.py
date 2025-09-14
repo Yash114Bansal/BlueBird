@@ -15,7 +15,7 @@ from decimal import Decimal
 
 from app.main import app
 from app.db.database import get_db, db_manager
-from app.models.booking import Base, Booking, BookingItem, EventAvailability, BookingStatus, PaymentStatus
+from app.models.booking import Base, Booking, BookingItem, EventAvailability, BookingStatus, PaymentStatus, WaitlistAuditLog, BookingAuditLog, WaitlistEntry
 from app.services.booking_service import BookingService
 from app.services.availability_service import AvailabilityService
 

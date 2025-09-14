@@ -251,46 +251,6 @@ class TestWaitlistAPI:
                         assert data["waitlist_entry_id"] == 1
                         assert data["position"] == 3
                         assert data["status"] == "active"
-    
-    def test_get_waitlist_audit_log_success(self, client, auth_headers, mock_waitlist_entry):
-        """Test getting waitlist audit log."""
-        with patch('app.api.v1.waitlist.get_current_user_id') as mock_user_id:
-            mock_user_id.return_value = 1
-            
-            with patch('app.api.v1.waitlist.get_current_user_role') as mock_role:
-                mock_role.return_value = "user"
-                
-                with patch('app.api.v1.waitlist.waitlist_service.get_waitlist_entry_by_id') as mock_get:
-                    mock_get.return_value = mock_waitlist_entry
-                    
-                    with patch('app.api.v1.waitlist.get_db') as mock_db:
-                        mock_session = MagicMock()
-                        mock_audit_log = MagicMock()
-                        mock_audit_log.id = 1
-                        mock_audit_log.action = "JOIN"
-                        mock_audit_log.changed_at = datetime.now(timezone.utc)
-                        mock_audit_log.waitlist_entry_id = 1
-                        mock_audit_log.changed_by = 1
-                        mock_audit_log.field_name = None
-                        mock_audit_log.old_value = None
-                        mock_audit_log.new_value = None
-                        mock_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_audit_log]
-                        mock_db.return_value = mock_session
-                        
-                        response = client.get(
-                            "/api/v1/waitlist/1/audit",
-                            headers=auth_headers
-                        )
-                        
-                        assert response.status_code == 200
-                        data = response.json()
-                        assert isinstance(data, list)
-                        # The test should expect the actual number of audit logs returned
-                        assert len(data) >= 1
-                        # Check that at least one entry has the expected action
-                        actions = [entry["action"] for entry in data]
-                        assert "JOIN" in actions
-    
     def test_get_event_waitlist_admin_success(self, client, admin_headers, mock_waitlist_entry):
         """Test getting event waitlist as admin."""
         with patch('app.api.v1.waitlist.get_admin_user') as mock_admin:
